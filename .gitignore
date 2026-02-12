@@ -1,6 +1,7 @@
 output/
 html/
 data/
+tei/
 musico_pratico.xpr
 
 node_modules/
