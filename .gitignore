@@ -1,0 +1,11 @@
+output/
+html/
+data/
+musico_pratico.xpr
+
+node_modules/
+package-lock.json
+package.json
+
+.vscode
+xsl-out/
