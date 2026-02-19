@@ -13,9 +13,9 @@
     <!-- z.B. #z-s033-r8  →  s033                                   -->
     <!-- ========================================================= -->
     <xsl:key name="by-page"
-             match="tei:notatedMusic 
-                    | tei:figure[@type=('graphic','table')]"
-             use="substring-before(substring-after(@facs, '#z-'), '-r')"/>
+        match="tei:notatedMusic 
+            | tei:figure[@type=('graphic','table')]"
+        use="substring-before(substring-after(@facs, '#z-'), '-r')"/>
     
     <!-- ========================================================= -->
     <!-- ROOT                                                      -->
@@ -35,13 +35,14 @@
                         ================================= */
                         
                         body {{
-                        max-width: 1100px;
-                        margin: 0 auto;
-                        padding: 1rem 2rem;
+                        width: 100%;
+                        margin: 0;
+                        padding: 1.5rem 3rem;
                         font-family: system-ui, sans-serif;
                         background: #f8f8fb;
                         line-height: 1.4;
                         }}
+
                         
                         header.tei-header {{
                         margin-bottom: 2rem;
@@ -116,76 +117,88 @@
                         gap: 0.25rem;
                         }}
                         
-                        
                         /* =================================
                         PAGE BLOCKS
                         ================================= */
-                        
+
                         #edition {{
                         margin-top: 2rem;
                         }}
-                        
+
+                        .page-main-full {{
+                        width: 100%;
+                        max-width: 100%;
+                        }}
+
                         .page-block {{
+                        max-width: 1800px;
+                        margin-left: auto;
+                        margin-right: auto;
                         display: grid;
-                        grid-template-columns: 3fr 1.2fr;
-                        gap: 1rem;
-                        margin-bottom: 2rem;
-                        padding: 1rem 1.25rem;
+                        grid-template-columns: 1fr 1.6fr;
+                        gap: 3rem;
+                        margin-bottom: 4rem;
+                        padding: 2rem 3rem;
                         background: #fff;
                         border-radius: 0.6rem;
                         box-shadow: 0 0.15rem 0.4rem rgba(0,0,0,0.08);
                         border-left: 4px solid #ccc;
                         }}
-                        
+
                         .page-main {{
-                        border-right: 1px dashed #ddd;
-                        padding-right: 1rem;
+                        min-width: 0;
+                        max-width: 850px;
                         }}
-                        
+
                         .page-side {{
-                        font-size: 0.85rem;
+                        position: sticky;
+                        top: 2rem;
+                        height: fit-content;
+                        padding-left: 1rem;
+                        border-left: 1px solid #eee;
                         }}
-                        
-                        .page-side h3 {{
-                        margin-top: 0;
+
+                        .mei-panel {{
+                        min-height: 1100px;
+                        margin-bottom: 3rem;
                         }}
-                        
-                        .page-side ul {{
-                        list-style: none;
-                        padding-left: 0;
-                        margin: 0;
-                        }}
-                        
+
                         
                         /* =================================
-                        ELEMENT BOXES
+                        INLINE ELEMENT BOXES
                         ================================= */
-                        
-                        .page-element {{
-                        display: flex;
-                        gap: 0.3rem;
-                        padding: 0.25rem 0.45rem;
-                        border-radius: 0.4rem;
-                        font-size: 0.8rem;
-                        border: 1px solid transparent;
-                        margin: 0.15rem 0;
+
+                        .element-box {{
+                        margin: 1.4rem 0;
+                        padding: 0.8rem 1rem;
+                        border-radius: 0.6rem;
+                        border: 1px solid #ddd;
+                        background: #fafafa;
                         }}
-                        
+
+                        .element-header {{
+                        font-size: 0.85rem;
+                        font-weight: 600;
+                        margin-bottom: 0.5rem;
+                        display: flex;
+                        align-items: center;
+                        gap: 0.4rem;
+                        }}
+
                         .element-music {{
                         border-color: #5c9d5c;
                         background: #eef9ee;
                         }}
-                        
+
                         .element-table {{
                         border-color: #4f6fae;
                         background: #edf2fb;
                         }}
-                        
+
                         .element-graphic {{
                         border-color: #b87b2c;
                         background: #fff4e0;
                         }}
-                        
                         
                         /* =================================
                         PAGE BREAK
@@ -247,21 +260,50 @@
                         font-style: italic;
                         }}
 
-                        /* =================================
-                        MEI LAYOUT
-                        ================================= */
-
-                        .mei‑panel {{
-                        border: 1px solid lightgray;
-                        min-height: 400px; 
-                        margin-bottom: 2rem;
-                        }}
-                        
                     </xsl:text>
                 </style>
+                <script type="module">
+                    <xsl:text>
+                        import 'https://editor.verovio.org/javascript/app/verovio-app.js';
 
+                        /**
+                        * Lädt eine MEI‑Datei und rendert sie im übergebenen DIV.
+                        */
+                        async function renderMei(container) {{
+                            const fileName = container.dataset.mei;       
+                            const url      = `mei/${{fileName}}`;   
+
+                            try {{
+                                const resp = await fetch(url);
+                                if (!resp.ok) throw new Error(`HTTP ${{resp.status}}`);
+
+                                const meiText = await resp.text();
+
+                                // Verovio‑Instanz anlegen.
+                                // hideControls:true entfernt den Browse‑Button und das Lade‑Overlay.
+                                const app = new Verovio.App(container, {{
+                                    hideControls: true,
+                                    scale: 50,
+                                    pageHeight: 2000,
+                                    pageWidth: 1200,
+                                    adjustPageHeight: true
+                                }});
+
+                                // Daten einspielen und rendern
+                                app.loadData(meiText);
+                            }} catch (e) {{
+                                console.error('MEI‑Datei konnte nicht geladen werden:', e);
+                                container.textContent = `Fehler beim Laden von ${{url}}`;
+                            }}
+                        }}
+
+                        // Alle DIVs mit dem data‑mei‑Attribut automatisch rendern
+                        document.querySelectorAll('[data-mei]').forEach(renderMei);
+                    </xsl:text>
+                </script>
+                
             </head>
-
+            
             
             <body>
                 
@@ -300,13 +342,13 @@
                     
                     <xsl:variable name="id" select="@xml:id"/>
                     <xsl:variable name="pbn"
-                                  select="/tei:TEI//tei:pb[@facs = '#' || $id][1]/@n"/>
+                        select="/tei:TEI//tei:pb[@facs = '#' || $id][1]/@n"/>
                     
                     <a href="#page-{$id}" class="page-cell-link">
                         <div class="page-cell
                                     {if (tei:zone[@type='music']) then ' has-music' else ''}
-                                    {if (tei:zone[@type='table']) then ' has-table' else ''}
-                                    {if (tei:zone[@type='graphic']) then ' has-graphic' else ''}">
+                                {if (tei:zone[@type='table']) then ' has-table' else ''}
+                                {if (tei:zone[@type='graphic']) then ' has-graphic' else ''}">
                             
                             <span class="page-label">
                                 S.{if ($pbn) then $pbn else $id}
@@ -340,94 +382,118 @@
         <div class="body">
             
             <xsl:for-each-group
-                select=".//tei:pb | .//tei:head | .//tei:p | .//tei:fw"
+                select="tei:pb | tei:head | tei:p | tei:fw"
                 group-starting-with="tei:pb">
                 
                 <xsl:variable name="pb" select="current-group()[1]"/>
                 <xsl:variable name="page-id"
-                              select="substring-after($pb/@facs, '#')"/>
+                    select="substring-after($pb/@facs, '#')"/>
+                
+                <!-- Alle MEI-Elemente dieser Seite -->
+                <xsl:variable name="mei-elements"
+                    select="key('by-page', $page-id)[self::tei:notatedMusic]"/>
                 
                 <div class="page-block" id="page-{$page-id}">
                     
-                    <!-- Linke Spalte: Text -->
+                    <!-- LINKE SPALTE -->
                     <div class="page-main">
                         
                         <hr class="pb"
                             data-page="{$pb/@n}"
                             data-facs="{$pb/@facs}"/>
                         
-                        <!-- Text ohne sig/catch -->
                         <xsl:apply-templates
                             select="current-group()[position() gt 1
-                                and not(self::tei:fw[@type=('sig','catch')])]"/>
+                                    and not(self::tei:fw[@type=('sig','catch')])]"/>
                         
-                        <!-- sig + catch unten -->
+                        <!-- sig + catch -->
                         <xsl:variable name="sig"
-                                      select="current-group()[self::tei:fw[@type='sig']][1]"/>
+                            select="current-group()[self::tei:fw[@type='sig']][1]"/>
                         <xsl:variable name="catch"
-                                      select="current-group()[self::tei:fw[@type='catch']][1]"/>
+                            select="current-group()[self::tei:fw[@type='catch']][1]"/>
                         
                         <xsl:if test="$sig or $catch">
                             <div class="fw-line fw-sig-catch">
-                                <span class="fw fw-sig">{$sig}</span>
-                                <span class="fw fw-catch">{$catch}</span>
+                                <span class="fw fw-sig">
+                                    <xsl:value-of select="$sig"/>
+                                </span>
+                                <span class="fw fw-catch">
+                                    <xsl:value-of select="$catch"/>
+                                </span>
                             </div>
                         </xsl:if>
                         
                     </div>
                     
-                    <!-- Rechte Spalte: Elemente -->
+                    <!-- RECHTE SPALTE -->
                     <div class="page-side">
-                        <h3>Elemente auf dieser Seite</h3>
                         
-                        <xsl:variable name="els"
-                                      select="key('by-page', $page-id)"/>
+                        <xsl:for-each select="$mei-elements">
+                            <div class="mei-panel"
+                                 data-mei="{substring-after(@source,'#')}.mei">
+                            </div>
+                        </xsl:for-each>
                         
-                        <xsl:choose>
-                            <xsl:when test="exists($els)">
-                                <ul>
-                                    <xsl:for-each select="$els">
-                                        <li class="page-element
-                                                   {if (self::tei:notatedMusic) then ' element-music' else ''}
-                                                   {if (self::tei:figure[@type='table']) then ' element-table' else ''}
-                                                   {if (self::tei:figure[@type='graphic']) then ' element-graphic' else ''}">
-                                            
-                                            <xsl:choose>
-                                                <xsl:when test="self::tei:notatedMusic">
-                                                    <span class="icon-music">&#9835;</span>
-                                                    Notierte Musik ({@facs})
-                                                </xsl:when>
-                                                <xsl:when test="self::tei:figure[@type='table']">
-                                                    <span class="icon-table">&#9633;</span>
-                                                    Tabelle ({@facs})
-                                                </xsl:when>
-                                                <xsl:when test="self::tei:figure[@type='graphic']">
-                                                    <span class="icon-graphic">&#128444;</span>
-                                                    Grafik ({@facs})
-                                                </xsl:when>
-                                            </xsl:choose>
-                                            
-                                        </li>
-                                    </xsl:for-each>
-                                </ul>
-                            </xsl:when>
-                            <xsl:otherwise>
-                                <p class="page-side-empty">
-                                    Keine grafischen Elemente.
-                                </p>
-                            </xsl:otherwise>
-                        </xsl:choose>
                     </div>
                     
                 </div>
                 
             </xsl:for-each-group>
+            
         </div>
+        
     </xsl:template>
+    
     
     <!-- ========================================================= -->
     <!-- STRUKTUR-ELEMENTE                                         -->
     <!-- ========================================================= -->
+    <xsl:template match="tei:notatedMusic">
+        
+        <div class="element-box element-music">
+            
+            <div class="element-header">
+                <span class="icon-music">&#9835;</span>
+                Notierte Musik
+            </div>
+        </div>
+        
+    </xsl:template>
+    
+    <xsl:template match="tei:figure[@type='table']">
+        
+        <div class="element-box element-table">
+            
+            <div class="element-header">
+                <span class="icon-table">&#9633;</span>
+                Tabelle
+            </div>
+            
+            <div class="figure-content"
+                 data-facs="{substring-after(@facs,'#')}">
+            </div>
+            
+        </div>
+        
+    </xsl:template>
+    
+    <xsl:template match="tei:figure[@type='graphic']">
+        
+        <div class="element-box element-graphic">
+            
+            <div class="element-header">
+                <span class="icon-graphic">&#128444;</span>
+                Grafik
+            </div>
+            
+            <div class="figure-content"
+                 data-facs="{substring-after(@facs,'#')}">
+            </div>
+            
+        </div>
+        
+    </xsl:template>
+    
     
     <xsl:template match="tei:p">
         <p><xsl:apply-templates/></p>
@@ -462,10 +528,6 @@
         <span class="fw"><xsl:apply-templates/></span>
     </xsl:template>
     
-    <!-- grafische Elemente nicht im Fließtext -->
-    <xsl:template match="tei:notatedMusic
-                         | tei:figure[@type='graphic']
-                         | tei:figure[@type='table']"/>
     
     <xsl:template match="text()">
         <xsl:value-of select="."/>
