@@ -125,42 +125,16 @@
                         margin-top: 2rem;
                         }}
 
-                        .page-main-full {{
-                        width: 100%;
-                        max-width: 100%;
-                        }}
-
                         .page-block {{
-                        max-width: 1800px;
+                        max-width: 850px;
                         margin-left: auto;
                         margin-right: auto;
-                        display: grid;
-                        grid-template-columns: 1fr 1.6fr;
-                        gap: 3rem;
                         margin-bottom: 4rem;
                         padding: 2rem 3rem;
                         background: #fff;
                         border-radius: 0.6rem;
                         box-shadow: 0 0.15rem 0.4rem rgba(0,0,0,0.08);
                         border-left: 4px solid #ccc;
-                        }}
-
-                        .page-main {{
-                        min-width: 0;
-                        max-width: 850px;
-                        }}
-
-                        .page-side {{
-                        position: sticky;
-                        top: 2rem;
-                        height: fit-content;
-                        padding-left: 1rem;
-                        border-left: 1px solid #eee;
-                        }}
-
-                        .mei-panel {{
-                        min-height: 1100px;
-                        margin-bottom: 3rem;
                         }}
 
                         
@@ -271,7 +245,7 @@
                         */
                         async function renderMei(container) {{
                             const fileName = container.dataset.mei;       
-                            const url      = `mei/${{fileName}}`;   
+                            const url      = `https://raw.githubusercontent.com/fabianmoss/pontio-examples/main/examples/${{fileName}}`;   
 
                             try {{
                                 const resp = await fetch(url);
@@ -382,60 +356,41 @@
         <div class="body">
             
             <xsl:for-each-group
-                select="tei:pb | tei:head | tei:p | tei:fw"
+                select="tei:pb | tei:head | tei:p | tei:fw
+                      | tei:div[@type='chapter']/(tei:pb | tei:head | tei:p | tei:fw)"
                 group-starting-with="tei:pb">
                 
                 <xsl:variable name="pb" select="current-group()[1]"/>
                 <xsl:variable name="page-id"
                     select="substring-after($pb/@facs, '#')"/>
                 
-                <!-- Alle MEI-Elemente dieser Seite -->
-                <xsl:variable name="mei-elements"
-                    select="key('by-page', $page-id)[self::tei:notatedMusic]"/>
-                
                 <div class="page-block" id="page-{$page-id}">
-                    
-                    <!-- LINKE SPALTE -->
-                    <div class="page-main">
-                        
-                        <hr class="pb"
-                            data-page="{$pb/@n}"
-                            data-facs="{$pb/@facs}"/>
-                        
-                        <xsl:apply-templates
-                            select="current-group()[position() gt 1
-                                    and not(self::tei:fw[@type=('sig','catch')])]"/>
-                        
-                        <!-- sig + catch -->
-                        <xsl:variable name="sig"
-                            select="current-group()[self::tei:fw[@type='sig']][1]"/>
-                        <xsl:variable name="catch"
-                            select="current-group()[self::tei:fw[@type='catch']][1]"/>
-                        
-                        <xsl:if test="$sig or $catch">
-                            <div class="fw-line fw-sig-catch">
-                                <span class="fw fw-sig">
-                                    <xsl:value-of select="$sig"/>
-                                </span>
-                                <span class="fw fw-catch">
-                                    <xsl:value-of select="$catch"/>
-                                </span>
-                            </div>
-                        </xsl:if>
-                        
-                    </div>
-                    
-                    <!-- RECHTE SPALTE -->
-                    <div class="page-side">
-                        
-                        <xsl:for-each select="$mei-elements">
-                            <div class="mei-panel"
-                                 data-mei="{substring-after(@source,'#')}.mei">
-                            </div>
-                        </xsl:for-each>
-                        
-                    </div>
-                    
+
+                    <hr class="pb"
+                        data-page="{$pb/@n}"
+                        data-facs="{$pb/@facs}"/>
+
+                    <xsl:apply-templates
+                        select="current-group()[position() gt 1
+                                and not(self::tei:fw[@type=('sig','catch')])]"/>
+
+                    <!-- sig + catch -->
+                    <xsl:variable name="sig"
+                        select="current-group()[self::tei:fw[@type='sig']][1]"/>
+                    <xsl:variable name="catch"
+                        select="current-group()[self::tei:fw[@type='catch']][1]"/>
+
+                    <xsl:if test="$sig or $catch">
+                        <div class="fw-line fw-sig-catch">
+                            <span class="fw fw-sig">
+                                <xsl:value-of select="$sig"/>
+                            </span>
+                            <span class="fw fw-catch">
+                                <xsl:value-of select="$catch"/>
+                            </span>
+                        </div>
+                    </xsl:if>
+
                 </div>
                 
             </xsl:for-each-group>
@@ -448,16 +403,19 @@
     <!-- ========================================================= -->
     <!-- STRUKTUR-ELEMENTE                                         -->
     <!-- ========================================================= -->
+    <xsl:template match="tei:notatedMusic[@mei]">
+        <div class="page-block">
+            <div class="mei-panel" data-mei="{@mei}.mei"/>
+        </div>
+    </xsl:template>
+
     <xsl:template match="tei:notatedMusic">
-        
         <div class="element-box element-music">
-            
             <div class="element-header">
                 <span class="icon-music">&#9835;</span>
                 Notierte Musik
             </div>
         </div>
-        
     </xsl:template>
     
     <xsl:template match="tei:figure[@type='table']">
