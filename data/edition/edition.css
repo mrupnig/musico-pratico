@@ -1,0 +1,267 @@
+body {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1rem 2rem;
+}
+
+#page-overview {
+    margin-bottom: 2.5rem;
+    padding: 1rem;
+    background: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.1rem 0.3rem rgba(0, 0, 0, 0.08);
+}
+
+#page-overview h2 {
+    margin-top: 0;
+    font-size: 1.2rem;
+}
+
+.page-grid {
+    margin-top: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
+    gap: 0.4rem;
+}
+
+.page-grid a.page-cell-link {
+    text-decoration: none;
+    color: inherit;
+    display: block; /* damit der Link wie ein Block wirkt */
+}
+
+.page-cell {
+    border: 1px solid #ddd;
+    border-radius: 0.35rem;
+    padding: 0.25rem 0.35rem;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fafafa;
+    cursor: pointer;
+}
+
+.page-cell .page-label {
+    font-weight: 600;
+}
+
+.page-cell .page-icons {
+    display: flex;
+    gap: 0.25rem;
+}
+
+/* Musik → grün */
+.page-cell.has-music {
+    border-color: #5c9d5c;
+    background: #eef9ee;
+}
+
+/* Tabelle → blau */
+.page-cell.has-table {
+    border-color: #4f6fae;
+    background: #edf2fb;
+}
+
+/* Grafik → orange – dafür fügen wir eine neue Klasse hinzu */
+.page-cell.has-graphic {
+    border-color: #b87b2c;
+    background: #fff4e0;
+}
+
+/* Kombinationen */
+.page-cell.has-music.has-table {
+    border: 2px solid #b35cae;
+    background: #fae7ff;
+}
+
+/* Kombinationen mit graphic → optisch stärker */
+.page-cell.has-music.has-graphic,
+.page-cell.has-table.has-graphic {
+    border-width: 2px;
+    border-color: #b87b2c;
+    background: #ffe9cc;
+}
+
+.page-cell.has-music.has-table.has-graphic {
+    border: 3px solid #7b4ca0;
+    background: #f6e2ff;
+}
+
+#edition {
+    margin-top: 2rem;
+}
+
+.page-block {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1.2fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding: 1rem 1.25rem;
+    background: #fff;
+    border-radius: 0.6rem;
+    box-shadow: 0 0.15rem 0.4rem rgba(0, 0, 0, 0.08);
+    border-left: 4px solid #ccc;
+}
+
+.page-main {
+    border-right: 1px dashed #ddd;
+    padding-right: 1rem;
+}
+
+.page-side {
+    font-size: 0.85rem;
+    align-self: flex-start;
+}
+
+.page-side h3 {
+    margin: 0 0 0.5rem;
+    font-size: 0.9rem;
+}
+
+.page-side ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.page-side li {
+    margin: 0.15rem 0;
+}
+
+/* Basissyle für alle Element-Boxen */
+.page-element {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.45rem;
+    border-radius: 0.4rem;
+    font-size: 0.8rem;
+    border: 1px solid transparent;
+}
+
+/* Farben analog zur Seitenübersicht */
+
+.page-element.element-music {
+    border-color: #5c9d5c;
+    background: #eef9ee;
+}
+
+.page-element.element-table {
+    border-color: #4f6fae;
+    background: #edf2fb;
+}
+
+.page-element.element-graphic {
+    border-color: #b87b2c;
+    background: #fff4e0;
+}
+
+.page-element .element-label {
+    flex: 1;
+}
+
+.icon-music,
+.icon-table,
+.icon-graphic {
+    font-size: 0.9rem;
+}
+
+.page-side-empty {
+    margin: 0;
+    color: #777;
+    font-style: italic;
+}
+
+.icon-music,
+.icon-table,
+.icon-graphic {
+    font-size: 0.9rem;
+}
+hr.pb {
+    border: none;
+    border-top: 3px solid #b0b0b0;
+    margin: 0 0 0.8rem;
+    position: relative;
+}
+
+hr.pb::before {
+    content: "Seite " attr(data-page);
+    position: absolute;
+    top: -1.3rem;
+    left: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #555;
+    background: #f8f8fb;
+    padding: 0 0.3rem;
+    border-radius: 0.3rem;
+}
+
+hr.pb::after {
+    content: attr(data-facs);
+    position: absolute;
+    top: -1.3rem;
+    right: 0;
+    font-size: 0.7rem;
+    color: #999;
+    background: #f8f8fb;
+    padding: 0 0.3rem;
+    border-radius: 0.3rem;
+}
+
+br.lb[data-n]::after {
+    content: attr(data-n);
+    font-size: 0.6rem;
+    color: #aaa;
+    vertical-align: super;
+    margin-left: 0.2rem;
+}
+.fw-line {
+    font-size: 0.75rem;
+    color: #555;
+}
+
+/* header links, folNum rechts */
+.fw-header-folnum {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 0.1rem;
+}
+
+.fw-header-folnum .fw-header {
+    text-align: left;
+    font-weight: 600;
+}
+
+.fw-header-folnum .fw-folnum {
+    text-align: right;
+    min-width: 4rem;
+}
+
+/* sig zentriert, catch rechts, am Seitenende */
+.fw-sig-catch {
+    display: flex;
+    margin-top: 0.8rem;
+}
+
+.fw-sig-catch .fw-sig {
+    flex: 1;
+    text-align: center;
+    font-style: italic;
+}
+
+.fw-sig-catch .fw-catch {
+    flex: 1;
+    text-align: right;
+    font-style: italic;
+    opacity: 0.9;
+}
+
+/* generische fw eher dezent */
+.fw {
+    font-size: 0.75rem;
+    color: #666;
+}

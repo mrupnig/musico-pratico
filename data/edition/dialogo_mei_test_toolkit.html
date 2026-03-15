@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html xmlns:tei="http://www.tei-c.org/ns/1.0" lang="it">
+
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <meta charset="UTF-8">
+   <title>
+   </title>
+   <style>
+      /* =================================
+         LAYOUT
+         ================================= */
+
+      body {
+         width: 100%;
+         margin: 0;
+         font-family: system-ui, sans-serif;
+         background: #f8f8fb;
+         line-height: 1.4;
+      }
+
+
+      header.tei-header {
+         max-width: 1800px;
+         margin-left: auto;
+         margin-right: auto;
+         margin-bottom: 2rem;
+         border-bottom: 2px solid #ccc;
+         padding-bottom: 0.5rem;
+         padding-left: 3rem;
+         padding-right: 3rem;
+      }
+
+      header.tei-header h1 {
+         margin: 0 0 0.25rem;
+      }
+
+      header.tei-header .author {
+         margin: 0;
+         font-style: italic;
+         color: #555;
+      }
+
+
+      /* =================================
+         PAGE OVERVIEW
+         ================================= */
+
+      #page-overview {
+         max-width: 1800px;
+         margin-left: auto;
+         margin-right: auto;
+         margin-bottom: 2.5rem;
+         padding: 1rem 3rem;
+         background: #fff;
+         border-radius: 0.5rem;
+         box-shadow: 0 0.1rem 0.3rem rgba(0, 0, 0, 0.08);
+      }
+
+      .page-grid {
+         display: grid;
+         grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
+         gap: 0.4rem;
+      }
+
+      .page-cell-link {
+         text-decoration: none;
+         color: inherit;
+         display: block;
+      }
+
+      .page-cell {
+         border: 1px solid #ddd;
+         border-radius: 0.35rem;
+         padding: 0.25rem 0.35rem;
+         font-size: 0.8rem;
+         display: flex;
+         justify-content: space-between;
+         align-items: center;
+         background: #fafafa;
+         cursor: pointer;
+      }
+
+      .page-cell.has-music {
+         border-color: #5c9d5c;
+         background: #eef9ee;
+      }
+
+      .page-cell.has-table {
+         border-color: #4f6fae;
+         background: #edf2fb;
+      }
+
+      .page-cell.has-graphic {
+         border-color: #b87b2c;
+         background: #fff4e0;
+      }
+
+      .page-icons {
+         display: flex;
+         gap: 0.25rem;
+      }
+
+      /* =================================
+         PAGE BLOCKS
+         ================================= */
+
+      #edition {
+         margin-top: 2rem;
+         padding-left: 3rem;
+         padding-right: 3rem;
+      }
+
+      .page-main-full {
+         width: 100%;
+         max-width: 100%;
+      }
+
+      .page-block {
+         max-width: 1800px;
+         margin-left: auto;
+         margin-right: auto;
+         display: grid;
+         grid-template-columns: 1fr 1.6fr;
+         gap: 3rem;
+         margin-bottom: 4rem;
+         padding: 2rem 3rem;
+         background: #fff;
+         border-radius: 0.6rem;
+         box-shadow: 0 0.15rem 0.4rem rgba(0, 0, 0, 0.08);
+         border-left: 4px solid #ccc;
+      }
+
+      .page-main {
+         min-width: 0;
+         max-width: 850px;
+      }
+
+      .page-side {
+         position: sticky;
+         top: 2rem;
+         height: fit-content;
+         padding-left: 1rem;
+         border-left: 1px solid #eee;
+      }
+
+      .mei-panel svg {
+         width: 100%;
+         height: auto;
+      }
+
+
+      /* =================================
+         INLINE ELEMENT BOXES
+         ================================= */
+
+      .element-box {
+         margin: 1.4rem 0;
+         padding: 0.8rem 1rem;
+         border-radius: 0.6rem;
+         border: 1px solid #ddd;
+         background: #fafafa;
+      }
+
+      .element-header {
+         font-size: 0.85rem;
+         font-weight: 600;
+         margin-bottom: 0.5rem;
+         display: flex;
+         align-items: center;
+         gap: 0.4rem;
+      }
+
+      .element-music {
+         border-color: #5c9d5c;
+         background: #eef9ee;
+      }
+
+      .element-table {
+         border-color: #4f6fae;
+         background: #edf2fb;
+      }
+
+      .element-graphic {
+         border-color: #b87b2c;
+         background: #fff4e0;
+      }
+
+      /* =================================
+         PAGE BREAK
+         ================================= */
+
+      hr.pb {
+         border: none;
+         border-top: 3px solid #b0b0b0;
+         margin: 0 0 0.8rem;
+         position: relative;
+      }
+
+      hr.pb::before {
+         content: "Seite " attr(data-page);
+         position: absolute;
+         top: -1.3rem;
+         left: 0;
+         font-size: 0.8rem;
+         font-weight: 600;
+         color: #555;
+      }
+
+      br.lb[data-n]::after {
+         content: attr(data-n);
+         font-size: 0.6rem;
+         color: #aaa;
+         vertical-align: super;
+         margin-left: 0.2rem;
+      }
+
+
+      /* =================================
+         FW LAYOUT
+         ================================= */
+
+      .fw-header-folnum {
+         display: flex;
+         justify-content: space-between;
+         border-bottom: 1px solid #ddd;
+         margin-bottom: 0.4rem;
+         font-size: 0.75rem;
+      }
+
+      .fw-sig-catch {
+         display: flex;
+         margin-top: 0.8rem;
+         font-size: 0.75rem;
+      }
+
+      .fw-sig {
+         flex: 1;
+         text-align: center;
+         font-style: italic;
+      }
+
+      .fw-catch {
+         flex: 1;
+         text-align: right;
+         font-style: italic;
+      }
+   </style>
+   <!-- Skript für Midi -->
+   <script src="https://www.midijs.net/lib/midi.js"></script>
+   <!-- Skript für Toolkit -->
+   <script src="https://www.verovio.org/javascript/latest/verovio-toolkit-wasm.js" defer></script>
+   <script>
+
+      // Lädt Toolkit und Einstellungen
+      document.addEventListener("DOMContentLoaded", () => {
+         verovio.module.onRuntimeInitialized = async _ => {
+         let tk = new verovio.toolkit();
+         console.log("Verovio has loaded!");
+         tk.setOptions({
+            scale: 30,
+            adjustPageWidth: true,
+            adjustPageHeight: true
+         });
+
+      // Lädt MEI-Datei
+      async function renderMEI(container) {
+         const fileName = container.dataset.mei;
+         const url = `mei/${fileName}`;
+         try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+            // Rendert MEI in SVG
+            const meiText = await resp.text();
+            tk.loadData(meiText)
+            let svg = tk.renderToSVG(1);
+            container.innerHTML = svg;
+
+            // MIDI Output
+            const midi = "data:audio/midi;base64," + tk.renderToMIDI();
+            const playbtn = document.createElement("button");
+            playbtn.textContent = "Play";
+            playbtn.addEventListener("click", () => MIDIjs.play(midi));
+
+            const stopBtn = document.createElement("button");
+            stopBtn.textContent = "Stop";
+            stopBtn.addEventListener("click", () => MIDIjs.stop());
+            container.prepend(stopBtn);
+            container.prepend(playbtn);
+
+         } catch (e) {
+            console.error('MEI‑Datei konnte nicht geladen werden:', e);
+            container.textContent = `Fehler beim Laden von ${url}`;
+         }
+      }
+
+      document.querySelectorAll('[data-mei]').forEach(renderMEI);
+
+         }
+   });
+   </script>
+</head>
+
+<body>
+   <header class="tei-header">
+      <h1>
+
+      </h1>
+      <p class="author">
+         Pietro
+         Pontio
+      </p>
+   </header>
+   <section id="page-overview">
+      <h2>Page overview</h2>
+      <div class="page-grid"><a href="#page-s001" class="page-cell-link">
+            <div
+               class="page-cell                                      has-music                                                                  ">
+               <span class="page-label">
+                  S.1
+               </span><span class="page-icons"><span class="icon-music">♫</span></span>
+            </div>
+         </a><a href="#page-s002" class="page-cell-link">
+            <div
+               class="page-cell                                      has-music                                                                  ">
+               <span class="page-label">
+                  S.2
+               </span><span class="page-icons"><span class="icon-music">♫</span></span>
+            </div>
+         </a><a href="#page-s003" class="page-cell-link">
+            <div
+               class="page-cell                                      has-music                                                                  ">
+               <span class="page-label">
+                  S.3
+               </span><span class="page-icons"><span class="icon-music">♫</span></span>
+            </div>
+         </a><a href="#page-s004" class="page-cell-link">
+            <div
+               class="page-cell                                      has-music                                                                  ">
+               <span class="page-label">
+                  S.4
+               </span><span class="page-icons"><span class="icon-music">♫</span></span>
+            </div>
+         </a><a href="#page-s005" class="page-cell-link">
+            <div
+               class="page-cell                                      has-music                                                                  ">
+               <span class="page-label">
+                  S.5
+               </span><span class="page-icons"><span class="icon-music">♫</span></span>
+            </div>
+         </a></div>
+   </section>
+   <section id="edition">
+      <div class="body">
+         <div class="page-block" id="page-s001">
+            <div class="page-main">
+               <hr class="pb" data-page="1" data-facs="#s001">
+               <div class="fw-line fw-header-folnum"><span class="fw fw-header">TERZA</span><span
+                     class="fw fw-folnum">100</span></div>
+               <p><br class="lb" data-n="1">Contraponto che ſi può cantare per Ottaua, per Decima,
+                  <br class="lb" data-n="2">&amp; per Duodecima.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="3">Replica per Ottaua.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="4">Replica per Decima.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="5">Replica per Duo decima.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="6">Io veggio chiaramente, che vi è varietà dal primo Contraponto, facendo
+                  <br class="lb" data-n="7">il principale nel graue à quello, che ſi troua fatto nell'acuto. Ma chi cau-
+                  <br class="lb" data-n="8">ſa queſta varietà? A. I mouimenti della parte acuta; poſciache rimane
+                  <br class="lb" data-n="9">ſopra il Canto Plano, e quella del graue ſotto d'eſſo canto. E queſta è la
+                  <br class="lb" data-n="10">cauſa, che leoſſeruationi non ponno ſodisfar à pieno all'vno, &amp;
+                  all'altro
+                  <br class="lb" data-n="11">Contraponto, come hanno veduto. G. Mi compiaccia V. S. ancora in
+                  <br class="lb" data-n="12">queſto di dirmi, ſe le oſſeruationi di quelli altri Contraponti già
+                  moſtrati
+                  <br class="lb" data-n="13">potranno ſeruir coſi nel graue, come nell'acuto. A. Alcune d'eſſe ſerui-
+                  <br class="lb" data-n="14">ranno all' vno, &amp; all'altro. Ecominciando dal Contraponto, che ſi può
+                  <br class="lb" data-n="15">modular per Ottaua, e ſeguendo per ordine (acciò habbiano notitia di
+               </p>
+            </div>
+            <div class="page-side">
+               <div class="mei-panel" data-mei="dialogo_p_100.mei"></div>
+            </div>
+         </div>
+         <div class="page-block" id="page-s002">
+            <div class="page-main">
+               <hr class="pb" data-page="2" data-facs="#s002">
+               <div class="fw-line fw-header-folnum"><span class="fw fw-header">PARTE</span><span
+                     class="fw fw-folnum">101</span></div>
+               <p><br class="lb" data-n="1">tutte l'oſſeruationi di ciaſcun Contraponto) moſtrarò, quali ſeruiranno
+                  <br class="lb" data-n="2">ad ambiduoi. E primieramente parlando di quel Contraponto, che può
+                  <br class="lb" data-n="3">modularſi per Ottaua in acuto dal ſuo principale fatto nella parte Baſſa.
+                  <br class="lb" data-n="4">non vi ſi troua differenza alcuna: e l'iſteſſa regola ſi può vſar, &amp;
+                  all'vno,
+                  <br class="lb" data-n="5">&amp; all altro, come diſſi, e come potranno comprendere da queſto eſsẽpio.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="6">Replica per Ottaua.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="7">Contraponto, che ſi può modulare per Ottaua.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="8">Di qui ſi manifeſta, che l'iſteſſa regola ſerue coſi nell'acuto, come nel
+                  gra
+                  <br class="lb" data-n="9">ue; benche queſto non ſia ſimile al primo, ch'io moſtrai in acuto. G. Ve-
+                  <br class="lb" data-n="10">ramente è coſi, come ella per ſua corteſia ne ha dimoſtrato. Ilche ci è
+                  ſta-
+                  <br class="lb" data-n="11">to di gran contento, e d'altre tanto ci ſerà il dir (piacendo à V. S. ) ſe
+                  nel-
+                  <br class="lb" data-n="12">li altri Contraponti ſi troua l'iſteſſa regola, &amp; oſſeruationi, che
+                  ſeruano
+                  <br class="lb" data-n="13">coſi nel graue come nell'acuto. A. Cosi farò. Eper dar loro ſodisfat-
+                  <br class="lb" data-n="14">tione, ſeguirò ordinatamente. E perciò volendo formare vn Contrapon-
+                  <br class="lb" data-n="15">to, che modular ſi poſſa per Decima lontano dal ſuo principale, ò ſia for-
+                  <br class="lb" data-n="16">mato nella parte graue, ò nella parte acuta, l'iſteſſe regole, &amp;
+                  oſſeruatio-
+                  <br class="lb" data-n="17">ni ſeruiranno ad ambedue, come accertarà la proua. La onde non fatica-
+                  <br class="lb" data-n="18">rò me, nè ſtancarò loro con altro eſſempio, che con l'vltimo dato, per cui
+                  <br class="lb" data-n="19">del tutto s'aſſicuraranno. G. Potrà dunque V. S. ſeguirſene alli altri per
+                  <br class="lb" data-n="20">ordine. A. Me ne paſſo al Contraponto, che ſi può modular per Duode
+                  <br class="lb" data-n="21">cima, oue l'iſteſſa regola, che ſi vsò nel crearlo nella parte acuta,
+                  aiutarà
+                  <br class="lb" data-n="22">anche totalmente nella parte Baſſa Eper non vi eſſer differenza alcuna,
+                  <br class="lb" data-n="23">non dirò altro ſopra ciò; ma ſeguendo al Contraponto, che ſi può modu
+                  <br class="lb" data-n="24">lar per Decima, e Duodecima, (in cui non cade altra nuoua regola: eſ-
+                  <br class="lb" data-n="25">ſendo conceſſo il poter vſar l'iſteſſe oſſeruationi in farlo nella parte
+                  baſſa,
+                  <br class="lb" data-n="26">—
+               </p>
+               <p><br class="lb" data-n="27">come
+               </p>
+            </div>
+            <div class="page-side">
+               <div class="mei-panel" data-mei="dialogo_p_101.mei"></div>
+            </div>
+         </div>
+         <div class="page-block" id="page-s003">
+            <div class="page-main">
+               <hr class="pb" data-page="3" data-facs="#s003">
+               <div class="fw-line fw-header-folnum"><span class="fw fw-header">TERLA</span><span
+                     class="fw fw-folnum">102</span></div>
+               <p><br class="lb" data-n="1">come l'iſperienza può moſtrar nell'eſſempio già dato) auuertird que-
+                  <br class="lb" data-n="2">ſto, che, facendoſi il ſuo principal nel Graue, ſi hà da ſchifare ogni moui-
+                  <br class="lb" data-n="3">mento ſopra il Canto Plano, ò figurato: perche nella replica, che ſi fa al-
+                  <br class="lb" data-n="4">la Duodecima, gli vengono molte diſſonanze fuori d'ogni regola. Ne tro
+                  <br class="lb" data-n="5">uandouiſi differenza alcuna dalla prima regola de' predetti Contrapon⸗
+                  <br class="lb" data-n="6">ti, fuorche di queſto, che ſi può modular per Ottaua, per Decima, e per
+                  <br class="lb" data-n="7">Duodecima; come all'hora, che ne parlai, già diſſi farò fine. G. Hah-
+                  <br class="lb" data-n="8">bia. no viſto vna ſol regola per li duoi antecedenti Contraponti fatti, vno
+                  <br class="lb" data-n="9">nel graue, e l'altro nell'acuto, come anche per gli altri, che di già hà mo-
+                  <br class="lb" data-n="10">ſtrato, compoſti in diuerſi modi; onde da cotal varietà piu mi ſi confer-
+                  <br class="lb" data-n="11">ma l'opinioue, che la prattica del comporre in Muſica ſia maggiore in ſe
+                  <br class="lb" data-n="12">ſteſſa, e di maggior valore, che la Theorica. A. E, perche le Sig. Voſtre
+                  <br class="lb" data-n="13">non ſi perſuadeſſero, che qui foſſe il fine d'ogni varietà fra Contrapon-
+                  <br class="lb" data-n="14">ti, ne moſtrarò alcuni altri che ſi ponno modulare e ſotto, e ſopra, mu-
+                  <br class="lb" data-n="15">tando le parti, ciò è, facendo il Baſſo Soprano, e'l Soprano Baſſo, &amp;
+                  alzã-
+                  <br class="lb" data-n="16">doſi la parte Baſſi per interuallo d'otto voci, diſtante dal ſuo originale,
+                  <br class="lb" data-n="17">&amp; abbaſtando l'acuta dal ſuo primo ſtato per Quinta, come moſtrarò ho-
+                  <br class="lb" data-n="18">ra con l'eſſempio.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="19">Parte mutata per Ottaua.
+               </p>
+            </div>
+            <div class="page-side">
+               <div class="mei-panel" data-mei="dialogo_p_102a.mei"></div>
+               <div class="mei-panel" data-mei="dialogo_p_102b.mei"></div>
+            </div>
+         </div>
+         <div class="page-block" id="page-s004">
+            <div class="page-main">
+               <hr class="pb" data-page="4" data-facs="#s004">
+               <div class="fw-line fw-header-folnum"><span class="fw fw-header">PARTE</span><span
+                     class="fw fw-folnum">103</span></div>
+               <p><br class="lb" data-n="1">l'arte mutata per * Quimta.</p>
+               <p><br class="lb" data-n="2">Di qui, mutate le parti, ſi ſcopre il Contraponto leggiadro, e bello.
+                  <br class="lb" data-n="3">G. Poiche è piacciuto à V. S. di inſtruirci delli altri, non ſi ſdegni anche
+                  <br class="lb" data-n="4">di darci la regola da oſſeruarſi in far queſto Contraponto, che queſto ſa-
+                  <br class="lb" data-n="5">rà ſua maggior corteſia, e più noſtra perfettione, &amp; obligo verſo di
+                  lei.
+                  <br class="lb" data-n="6">A. Si dè priuarſi della Conſonanza Seſta, e della Diſlonanza Settima, e
+                  <br class="lb" data-n="7">Seconda. La Diſſonanza Quarta voi, e l'altre Conſonanze, ſi potran-
+                  <br class="lb" data-n="8">no vſar à piacimento. G. Fauoriſcaci Voſtra Signoria di dir la cagio-
+                  <br class="lb" data-n="9">ne, per cui ſi laſciano la Seſta, e quelle diſſonanze. A. Si laſciano,
+                  perche,
+                  <br class="lb" data-n="10">mutandoſi le parti al modo, che ſi fa, ne ſorgerebbero delle diſſonanze
+                  <br class="lb" data-n="11">fuori d'ogni regola, &amp; ordine. G. Già, che hò inteſa la cauſa, potrà V.
+                  S.
+                  <br class="lb" data-n="12">à ſuo piacere farſene paſſaggio ad altri Contraponti. A. Scoprirò hora.
+                  <br class="lb" data-n="13">vn'altro Contraponto, che ſi può modular, alzando la parte Baſſa per-
+                  <br class="lb" data-n="14">Quinta, e la ſuperiore reſterà ferma, come qui.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="15">Parte, che non ſi muoue.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="16">Parte alzata per Quinta.
+               </p>
+            </div>
+            <div class="page-side">
+               <div class="mei-panel" data-mei="dialogo_p_103.mei"></div>
+            </div>
+         </div>
+         <div class="page-block" id="page-s005">
+            <div class="page-main">
+               <hr class="pb" data-page="5" data-facs="#s005">
+               <div class="fw-line fw-header-folnum"><span class="fw fw-header">TERLA</span><span
+                     class="fw fw-folnum">104</span></div>
+               <p><br class="lb" data-n="1">G. Veggiò ciò con ogni chiarezza poſſibile; mà, ſe V. S. non vuol laſciat
+                  <br class="lb" data-n="2">l'ordine incominciato nell'eſſercitar la ſua corteſia, ci darà il modo di
+                  far
+                  <br class="lb" data-n="3">ne vn ſimile. A. Il farò volontieri. Leuiſi la Conſonanza Ottaua, la Se-
+                  <br class="lb" data-n="4">ſta, e la Settima: vi ſi concede poi l'vſar la diſſonanza Quarta, e tutte le
+                  <br class="lb" data-n="5">altre conſonanze. Auuertendo però, che il Contraponto non vada ſot-
+                  <br class="lb" data-n="6">to il Canto Plano, ò figurato, quando ſi crea detto Contraponto; ma ſtia
+                  <br class="lb" data-n="7">ſopra; che coſi fia di buona riuſcita. Deſiderendo poſcia il far vn'altro
+                  <br class="lb" data-n="8">variato Contraponto, che ſi poſſi alzar la parte Baſſa per vna Quinta, &amp;
+                  <br class="lb" data-n="9">abbaſſar la Superiore per vna Terza dal ſuo primo ſtato, non biſogna far
+                  <br class="lb" data-n="10">due Terze, nè Seſta; ne Vniſono, uè Ottaua, nè Settima. Eben lecito il
+                  <br class="lb" data-n="11">ſeruirſi della Quarta, mà più lodeuole è il laſciarla; poſciache nella par-
+                  <br class="lb" data-n="12">te, che ſi moue per terza, vien ſaluata la Quarta con la Quinta; ſtando
+                  <br class="lb" data-n="13">però, che non ecceda più d'otto voci tra i ſuoi eſtremi, e, che’l Contra-
+                  <br class="lb" data-n="14">ponto non vadi ſotto il Canto Plano; mà tuttauia ſopra, &amp; ecco l'eſ-
+                  <br class="lb" data-n="15">ſempio.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="16">Parte alzata per Quinta.
+               <div class="element-box element-music">
+                  <div class="element-header"><span class="icon-music">♫</span>
+                     Notierte Musik
+                  </div>
+               </div>
+               </p>
+               <p><br class="lb" data-n="17">Equeſta è la ſuperiore abaſſata per terza.</p>
+               <p><br class="lb" data-n="18">Hora potgerò vn'altro Contraponto, oue la parte ſuperiore ſi potrà mu-
+                  <br class="lb" data-n="19">tare per Ottaua, e la inferiore per Quinta in acuto dal ſuo originale; e ne
+                  <br class="lb" data-n="20">dò l'eſſempio, ch'è queſto.
+               </p>
+            </div>
+            <div class="page-side">
+               <div class="mei-panel" data-mei="dialogo_p_104a.mei"></div>
+               <div class="mei-panel" data-mei="dialogo_p_104b.mei"></div>
+            </div>
+         </div>
+      </div>
+   </section>
+</body>
+
+</html>

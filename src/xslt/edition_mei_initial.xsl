@@ -13,9 +13,9 @@
     <!-- z.B. #z-s033-r8  →  s033                                   -->
     <!-- ========================================================= -->
     <xsl:key name="by-page"
-             match="tei:notatedMusic 
-                    | tei:figure[@type=('graphic','table')]"
-             use="substring-before(substring-after(@facs, '#z-'), '-r')"/>
+        match="tei:notatedMusic 
+            | tei:figure[@type=('graphic','table')]"
+        use="substring-before(substring-after(@facs, '#z-'), '-r')"/>
     
     <!-- ========================================================= -->
     <!-- ROOT                                                      -->
@@ -35,13 +35,14 @@
                         ================================= */
                         
                         body {{
-                        max-width: 1100px;
-                        margin: 0 auto;
-                        padding: 1rem 2rem;
+                        width: 100%;
+                        margin: 0;
+                        padding: 1.5rem 3rem;
                         font-family: system-ui, sans-serif;
                         background: #f8f8fb;
                         line-height: 1.4;
                         }}
+
                         
                         header.tei-header {{
                         margin-bottom: 2rem;
@@ -124,20 +125,44 @@
                         margin-top: 2rem;
                         }}
 
-                        .page-block {{
+                        .page-main-full {{
                         width: 100%;
-                        margin-bottom: 2rem;
-                        padding: 1.2rem 1.6rem;
+                        max-width: 100%;
+                        }}
+
+                        .page-block {{
+                        max-width: 1800px;
+                        margin-left: auto;
+                        margin-right: auto;
+                        display: grid;
+                        grid-template-columns: 1fr 1.6fr;
+                        gap: 3rem;
+                        margin-bottom: 4rem;
+                        padding: 2rem 3rem;
                         background: #fff;
                         border-radius: 0.6rem;
                         box-shadow: 0 0.15rem 0.4rem rgba(0,0,0,0.08);
                         border-left: 4px solid #ccc;
                         }}
 
-                        .page-main-full {{
-                        width: 100%;
-                        max-width: 100%;
+                        .page-main {{
+                        min-width: 0;
+                        max-width: 850px;
                         }}
+
+                        .page-side {{
+                        position: sticky;
+                        top: 2rem;
+                        height: fit-content;
+                        padding-left: 1rem;
+                        border-left: 1px solid #eee;
+                        }}
+
+                        .mei-panel {{
+                        min-height: 1100px;
+                        margin-bottom: 3rem;
+                        }}
+
                         
                         /* =================================
                         INLINE ELEMENT BOXES
@@ -235,19 +260,6 @@
                         font-style: italic;
                         }}
 
-                        /* =================================
-                        MEI LAYOUT
-                        ================================= */
-
-                        .mei-panel {{
-                        border: 1px solid lightgray;
-                        min-height: 800px;
-                        width: 100%;
-                        overflow: auto;
-                        margin: 1.5rem 0;
-                        }}
-
-                        
                     </xsl:text>
                 </style>
                 <script type="module">
@@ -270,10 +282,11 @@
                                 // Verovio‑Instanz anlegen.
                                 // hideControls:true entfernt den Browse‑Button und das Lade‑Overlay.
                                 const app = new Verovio.App(container, {{
-                                    hideControls: true,     
-                                    scale: 40, 
-                                    pageHeight: 800,
-                                    pageWidth: 600
+                                    hideControls: true,
+                                    scale: 50,
+                                    pageHeight: 2000,
+                                    pageWidth: 1200,
+                                    adjustPageHeight: true
                                 }});
 
                                 // Daten einspielen und rendern
@@ -288,9 +301,9 @@
                         document.querySelectorAll('[data-mei]').forEach(renderMei);
                     </xsl:text>
                 </script>
-
+                
             </head>
-
+            
             
             <body>
                 
@@ -329,13 +342,13 @@
                     
                     <xsl:variable name="id" select="@xml:id"/>
                     <xsl:variable name="pbn"
-                                  select="/tei:TEI//tei:pb[@facs = '#' || $id][1]/@n"/>
+                        select="/tei:TEI//tei:pb[@facs = '#' || $id][1]/@n"/>
                     
                     <a href="#page-{$id}" class="page-cell-link">
                         <div class="page-cell
                                     {if (tei:zone[@type='music']) then ' has-music' else ''}
-                                    {if (tei:zone[@type='table']) then ' has-table' else ''}
-                                    {if (tei:zone[@type='graphic']) then ' has-graphic' else ''}">
+                                {if (tei:zone[@type='table']) then ' has-table' else ''}
+                                {if (tei:zone[@type='graphic']) then ' has-graphic' else ''}">
                             
                             <span class="page-label">
                                 S.{if ($pbn) then $pbn else $id}
@@ -369,27 +382,31 @@
         <div class="body">
             
             <xsl:for-each-group
-                select=".//tei:pb | .//tei:head | .//tei:p | .//tei:fw"
+                select="tei:pb | tei:head | tei:p | tei:fw"
                 group-starting-with="tei:pb">
                 
                 <xsl:variable name="pb" select="current-group()[1]"/>
                 <xsl:variable name="page-id"
                     select="substring-after($pb/@facs, '#')"/>
                 
-                <div class="page-block page-fullwidth" id="page-{$page-id}">
+                <!-- Alle MEI-Elemente dieser Seite -->
+                <xsl:variable name="mei-elements"
+                    select="key('by-page', $page-id)[self::tei:notatedMusic]"/>
+                
+                <div class="page-block" id="page-{$page-id}">
                     
-                    <div class="page-main-full">
+                    <!-- LINKE SPALTE -->
+                    <div class="page-main">
                         
                         <hr class="pb"
                             data-page="{$pb/@n}"
                             data-facs="{$pb/@facs}"/>
                         
-                        <!-- Alles in Dokumentreihenfolge -->
                         <xsl:apply-templates
                             select="current-group()[position() gt 1
                                     and not(self::tei:fw[@type=('sig','catch')])]"/>
                         
-                        <!-- sig + catch unten -->
+                        <!-- sig + catch -->
                         <xsl:variable name="sig"
                             select="current-group()[self::tei:fw[@type='sig']][1]"/>
                         <xsl:variable name="catch"
@@ -408,13 +425,25 @@
                         
                     </div>
                     
+                    <!-- RECHTE SPALTE -->
+                    <div class="page-side">
+                        
+                        <xsl:for-each select="$mei-elements">
+                            <div class="mei-panel"
+                                 data-mei="{substring-after(@source,'#')}.mei">
+                            </div>
+                        </xsl:for-each>
+                        
+                    </div>
+                    
                 </div>
                 
             </xsl:for-each-group>
+            
         </div>
         
     </xsl:template>
-
+    
     
     <!-- ========================================================= -->
     <!-- STRUKTUR-ELEMENTE                                         -->
@@ -427,9 +456,6 @@
                 <span class="icon-music">&#9835;</span>
                 Notierte Musik
             </div>
-        </div>
-        <div class="mei-panel"
-             data-mei="{substring-after(@source,'#')}.mei">
         </div>
         
     </xsl:template>
@@ -450,7 +476,7 @@
         </div>
         
     </xsl:template>
-
+    
     <xsl:template match="tei:figure[@type='graphic']">
         
         <div class="element-box element-graphic">
@@ -467,8 +493,8 @@
         </div>
         
     </xsl:template>
-
-
+    
+    
     <xsl:template match="tei:p">
         <p><xsl:apply-templates/></p>
     </xsl:template>
@@ -501,7 +527,7 @@
     <xsl:template match="tei:fw">
         <span class="fw"><xsl:apply-templates/></span>
     </xsl:template>
-
+    
     
     <xsl:template match="text()">
         <xsl:value-of select="."/>

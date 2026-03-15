@@ -85,7 +85,7 @@ wheels = [
 [[package]]
 name = "musico-pratico"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "lxml" },
 ]

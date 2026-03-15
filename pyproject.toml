@@ -7,3 +7,12 @@ requires-python = ">=3.12"
 dependencies = [
     "lxml>=6.0.2",
 ]
+
+[project.scripts]
+page2tei = "page2tei.pageXML_to_TEI:main"
+
+[tool.uv]
+package = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/page2tei"]

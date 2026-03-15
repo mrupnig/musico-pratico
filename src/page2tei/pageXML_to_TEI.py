@@ -1,15 +1,8 @@
 from pathlib import Path
 from lxml import etree
+import argparse
 import re
 import unicodedata
-
-FOLDER_NAME = "Dialogo_1595"
-#FOLDER_NAME = "Ragionamento_1588"
-
-SOURCE_DIR = Path(f"data/{FOLDER_NAME}")
-
-OUTPUT = Path(f"tei/{FOLDER_NAME}.xml")
-OUTPUT.parent.mkdir(parents=True, exist_ok=True)
 
 TEI_NS = "http://www.tei-c.org/ns/1.0"
 XML_ID = "{http://www.w3.org/XML/1998/namespace}id"
@@ -820,6 +813,29 @@ def main():
     Reads PAGE XML sources, writes a TEI XML output file, and updates the
     global UNUSUAL dictionary.
     """
+
+    parser = argparse.ArgumentParser(description="Konvertiert PAGE XML nach TEI.")
+    parser.add_argument(
+        "--input", "-i",
+        type=Path,
+        default=Path("data/pages"),
+        help="Verzeichnis mit PAGE XML-Dateien (Standard: data/pages)",
+    )
+    parser.add_argument(
+        "--output", "-o",
+        type=Path,
+        default=Path("data/tei"),
+        help="Ausgabepfad der TEI XML-Datei (Standard: data/tei)",
+    )
+    args = parser.parse_args()
+
+    SOURCE_DIR = args.input
+    if args.output is not None:
+        OUTPUT = args.output
+    else:
+        OUTPUT = Path("data/tei") / f"{SOURCE_DIR.name}.xml"
+
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
 
     tei_root = etree.Element(tei("TEI"), nsmap={None: TEI_NS})
     tei_header = etree.SubElement(tei_root, tei("teiHeader"))

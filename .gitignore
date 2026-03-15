@@ -1,12 +1,23 @@
-output/
-html/
-data/
-tei/
-musico_pratico.xpr
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# uv / Build
+dist/
+*.egg-info/
+
+# MEI-Data
+data/edition/mei/*.mei
+
+# Inputs
+data/pages/
+
+# Outputs (generiert)
+data/tei/
+mini-edition/
 
 node_modules/
-package-lock.json
-package.json
 
-.vscode
-xsl-out/
+#xslt
+.vscode/
