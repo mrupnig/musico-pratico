@@ -827,6 +827,12 @@ def main():
         default=Path("data/tei"),
         help="Ausgabepfad der TEI XML-Datei (Standard: data/tei)",
     )
+    parser.add_argument(
+        "--start-folio", "-sf",
+        type=int,
+        default=1,
+        help="Erste Folio-Nummer für fw[@type='folNum']/@n (Standard: 1)",
+    )
     args = parser.parse_args()
 
     SOURCE_DIR = args.input
@@ -932,6 +938,8 @@ def main():
     if not xml_files:
         print(f"Keine XML-Dateien in {SOURCE_DIR}")
         return
+
+    folio_no = args.start_folio
 
     current_chapter = None
     heading_open = False
@@ -1058,6 +1066,8 @@ def main():
             # 2) Seitenzahl: TextRegion type="page-number" → ebenfalls puffern
             if rtype_lc == "page-number":
                 fw = add_fw(chapter_parent, zone_id, region_el, rtype_lc)
+                fw.set("n", str(folio_no))
+                folio_no += 1
                 parent_fw = fw.getparent()
                 if parent_fw is not None:
                     parent_fw.remove(fw)
