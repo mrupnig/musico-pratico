@@ -69,21 +69,22 @@ def base_mapping(ch: str) -> str | None:
         return None
     return base.lower()
 
-def next_lb(parent, n: int):
+def next_lb(parent, n: int | None):
     """
     Insert a TEI <lb> (line break) element into the given parent element.
 
     A newline is inserted before the new element. If the parent already has
     child nodes, the newline is appended to the tail of the last child;
-    otherwise, it is written into the parent's text. The <lb> receives an
-    `@n` attribute containing the line number.
+    otherwise, it is written into the parent's text. If `n` is not None,
+    the <lb> receives an `@n` attribute containing the line number.
 
     Parameters
     ----------
     parent : etree._Element
         The TEI parent element to append to.
-    n : int | str
-        Line number or identifier to assign to the <lb>.
+    n : int | str | None
+        Line number or identifier to assign to the <lb>. If None, no @n
+        attribute is set (e.g. for unnumbered caption lines).
 
     Returns
     -------
@@ -98,7 +99,8 @@ def next_lb(parent, n: int):
     else:
         parent.text = (parent.text or "") + "\n"
     lb = etree.SubElement(parent, tei("lb"))
-    lb.set("n", str(n))
+    if n is not None:
+        lb.set("n", str(n))
     return lb
 
 def tei(tag):
@@ -314,7 +316,7 @@ def get_baseline_xy(line_el):
     x = min(xs)
     return x, y
 
-def add_paragraph(parent, zone_id, region_el, page_state, merge_into_prev=False):
+def add_paragraph(parent, zone_id, region_el, page_state, merge_into_prev=False, numbered=True):
     """
     Create or extend a TEI paragraph (<p>) from a PAGE TextRegion.
 
@@ -340,6 +342,9 @@ def add_paragraph(parent, zone_id, region_el, page_state, merge_into_prev=False)
             - "current_pb": reference to the <pb> element
     merge_into_prev : bool
         Whether this paragraph continues the previous one.
+    numbered : bool
+        Whether to assign @n line numbers to <lb> elements and advance the
+        line counter. Set to False for caption regions.
 
     Returns
     -------
@@ -440,11 +445,12 @@ def add_paragraph(parent, zone_id, region_el, page_state, merge_into_prev=False)
         # Wenn mehrere Segmente auf gleicher Höhe und in TableRegion:
         # gleiche Grundnummer + a/b/c-Suffix
         if len(group) > 1 and near_table:
-            page_state["line_no"] += 1
-            base_no = page_state["line_no"]
+            if numbered:
+                page_state["line_no"] += 1
+            base_no = page_state["line_no"] if numbered else None
             for idx, d in enumerate(group):
-                suffix = chr(ord("a") + idx)   # a, b, c ...
-                lb = next_lb(p, f"{base_no}{suffix}")
+                n_val = f"{base_no}{chr(ord('a') + idx)}" if numbered else None
+                lb = next_lb(p, n_val)
                 text = get_text_equiv(d["el"]).rstrip()
                 if not text:
                     continue
@@ -453,8 +459,9 @@ def add_paragraph(parent, zone_id, region_el, page_state, merge_into_prev=False)
         else:
             # normale Zeilen: jede Zeile eigene Nummer
             for d in group:
-                page_state["line_no"] += 1
-                lb = next_lb(p, page_state["line_no"])
+                if numbered:
+                    page_state["line_no"] += 1
+                lb = next_lb(p, page_state["line_no"] if numbered else None)
                 text = get_text_equiv(d["el"]).rstrip()
                 if not text:
                     continue
@@ -998,6 +1005,9 @@ def main():
         page_state["line_no"] = 0
         page_state["after_pb"] = True
         page_state["current_pb"] = pb
+        page_state["page_folio"] = None
+
+        page_music_els = []
         
 
         # Zonen erzeugen
@@ -1067,6 +1077,7 @@ def main():
             if rtype_lc == "page-number":
                 fw = add_fw(chapter_parent, zone_id, region_el, rtype_lc)
                 fw.set("n", str(folio_no))
+                page_state["page_folio"] = folio_no
                 folio_no += 1
                 parent_fw = fw.getparent()
                 if parent_fw is not None:
@@ -1140,17 +1151,42 @@ def main():
                     else:
                         target.text = (target.text or "") + "\n"
 
-                add_music(target, zone_id, region_el)
+                music_el = add_music(target, zone_id, region_el)
+                page_music_els.append((music_el, page_state["line_no"]))
                 continue
 
             
 
-            p = add_paragraph(chapter_parent, zone_id, region_el, page_state, merge_into_prev=False)
+            p = add_paragraph(chapter_parent, zone_id, region_el, page_state, merge_into_prev=False,
+                              numbered=(rtype_lc != "caption"))
             last_paragraph = p
             page_state["after_pb"] = False
             if current_chapter is not None:
                 in_chapter_body = True
         
+        # --- @mei auf notatedMusic-Elemente dieser Seite setzen ---
+        if page_music_els and page_state["page_folio"] is not None:
+            folio = page_state["page_folio"]
+
+            # Elemente nach Zeilennähe gruppieren (Abstand ≤ 1 lb → gleiche Gruppe)
+            groups = [[page_music_els[0]]]
+            for i in range(1, len(page_music_els)):
+                prev_ln = page_music_els[i - 1][1]
+                curr_ln = page_music_els[i][1]
+                if curr_ln - prev_ln <= 1:
+                    groups[-1].append(page_music_els[i])
+                else:
+                    groups.append([page_music_els[i]])
+
+            if len(groups) == 1 and len(groups[0]) == 1:
+                # Einzelnes isoliertes Element: kein Suffix
+                groups[0][0][0].set("mei", f"dialogo_p_{folio}")
+            else:
+                # Mehrere Gruppen oder eine Gruppe mit mehreren Elementen: a/b/c-Suffix
+                for g_idx, group in enumerate(groups):
+                    suffix = chr(ord("a") + g_idx)
+                    group[0][0].set("mei", f"dialogo_p_{folio}{suffix}")
+
         # --- Ende dieser Seite: header/folNum direkt hinter das pb dieser Seite setzen ---
         pb_el = page_state.get("current_pb")
         if pb_el is not None and page_fw_headers:
