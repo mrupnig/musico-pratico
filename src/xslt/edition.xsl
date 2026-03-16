@@ -137,6 +137,18 @@
                         border-left: 4px solid #ccc;
                         }}
 
+                        .mei-panel {{
+                        width: 100%;
+                        margin: 1rem 0;
+                        overflow: hidden;
+                        }}
+
+                        .mei-panel svg {{
+                        width: 100%;
+                        height: auto;
+                        display: block;
+                        }}
+
                         
                         /* =================================
                         INLINE ELEMENT BOXES
@@ -236,43 +248,60 @@
 
                     </xsl:text>
                 </style>
-                <script type="module">
+                
+                
+                <script src="https://www.verovio.org/javascript/latest/verovio-toolkit-wasm.js" defer="defer"/>
+                <script src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.58,npm/@magenta/music@1.23.1/es6/core.js,npm/html-midi-player@1.5.0" defer="defer"/>
+                <script>
                     <xsl:text>
-                        import 'https://editor.verovio.org/javascript/app/verovio-app.js';
+                        document.addEventListener("DOMContentLoaded", () => {{
+                            verovio.module.onRuntimeInitialized = async () => {{
+                                const tk = new verovio.toolkit();
+                                const containers = document.querySelectorAll('[data-mei]');
+                                for (const container of containers) {{
+                                    await renderMei(tk, container);
+                                }}
+                            }};
+                        }});
 
-                        /**
-                        * Lädt eine MEI‑Datei und rendert sie im übergebenen DIV.
-                        */
-                        async function renderMei(container) {{
-                            const fileName = container.dataset.mei;       
-                            const url      = `https://raw.githubusercontent.com/fabianmoss/pontio-examples/main/examples/${{fileName}}`;   
+                        async function renderMei(tk, container) {{
+                            const fileName = container.dataset.mei;
+                            const url = `https://raw.githubusercontent.com/fabianmoss/pontio-examples/main/examples/${{fileName}}`;
+                            const scale = parseInt(container.dataset.scale || "40");
+                            const width = Math.max(100, Math.round(container.clientWidth * 2.5));
 
                             try {{
                                 const resp = await fetch(url);
                                 if (!resp.ok) throw new Error(`HTTP ${{resp.status}}`);
-
                                 const meiText = await resp.text();
 
-                                // Verovio‑Instanz anlegen.
-                                // hideControls:true entfernt den Browse‑Button und das Lade‑Overlay.
-                                const app = new Verovio.App(container, {{
-                                    hideControls: true,
-                                    scale: 50,
-                                    pageHeight: 2000,
-                                    pageWidth: 1200,
-                                    adjustPageHeight: true
+                                tk.setOptions({{
+                                    scale: scale,
+                                    pageWidth: width,
+                                    adjustPageHeight: true,
+                                    breaks: "auto"
                                 }});
 
-                                // Daten einspielen und rendern
-                                app.loadData(meiText);
+                                tk.loadData(meiText);
+                                container.innerHTML = tk.renderToSVG(1);
+
+                                const pageCount = tk.getPageCount();
+                                for (let p = 2; p &lt;= pageCount; p++) {{
+                                    container.innerHTML += tk.renderToSVG(p);
+                                }}
+
+                                const midiBase64 = tk.renderToMIDI();
+                                if (midiBase64) {{
+                                    const player = document.createElement('midi-player');
+                                    player.setAttribute('src', `data:audio/midi;base64,${{midiBase64}}`);
+                                    player.setAttribute('sound-font', 'https://storage.googleapis.com/magentadata/js/soundfonts/sgm_plus');
+                                    container.appendChild(player);
+                                }}
                             }} catch (e) {{
-                                console.error('MEI‑Datei konnte nicht geladen werden:', e);
-                                container.textContent = `Fehler beim Laden von ${{url}}`;
+                                console.error('MEI konnte nicht geladen werden:', e);
+                                container.textContent = `Fehler beim Laden von ${{fileName}}: ${{e.message}}`;
                             }}
                         }}
-
-                        // Alle DIVs mit dem data‑mei‑Attribut automatisch rendern
-                        document.querySelectorAll('[data-mei]').forEach(renderMei);
                     </xsl:text>
                 </script>
                 
