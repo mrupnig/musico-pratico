@@ -226,6 +226,10 @@
                         display: block;
                         }}
 
+                        g.note.playing {{
+                        fill: crimson;
+                        }}
+
                         
                         /* =================================
                         INLINE ELEMENT BOXES
@@ -331,6 +335,8 @@
                 <script src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.58,npm/@magenta/music@1.23.1/es6/core.js,npm/html-midi-player@1.5.0" defer="defer"/>
                 <script>
                     <xsl:text>
+                        let highlightFrame = null;
+
                         // Toolkit wird einmalig initialisiert und als Promise gecacht
                         const tkReady = new Promise(resolve => {{
                             document.addEventListener("DOMContentLoaded", () => {{
@@ -358,10 +364,32 @@
                         }});
 
                         function closeModal() {{
+                            if (highlightFrame) {{
+                                cancelAnimationFrame(highlightFrame);
+                                highlightFrame = null;
+                            }}
                             const modal = document.getElementById('mei-modal');
                             modal.setAttribute('hidden', '');
                             document.body.style.overflow = '';
                             document.getElementById('mei-modal-render').innerHTML = '';
+                        }}
+
+                        function startHighlighting(tk, player, renderDiv) {{
+                            function step() {{
+                                if (player.playing) {{
+                                    const timeMs = player.currentTime * 1000;
+                                    const elements = tk.getElementsAtTime(timeMs);
+                                    renderDiv.querySelectorAll('g.note.playing').forEach(n => n.classList.remove('playing'));
+                                    if (elements &amp;&amp; elements.notes) {{
+                                        for (const noteId of elements.notes) {{
+                                            const el = document.getElementById(noteId);
+                                            if (el) el.classList.add('playing');
+                                        }}
+                                    }}
+                                }}
+                                highlightFrame = requestAnimationFrame(step);
+                            }}
+                            highlightFrame = requestAnimationFrame(step);
                         }}
 
                         async function openModal(meiFile) {{
@@ -405,6 +433,7 @@
                                     player.setAttribute('src', `data:audio/midi;base64,${{midiBase64}}`);
                                     player.setAttribute('sound-font', 'https://storage.googleapis.com/magentadata/js/soundfonts/sgm_plus');
                                     renderDiv.appendChild(player);
+                                    startHighlighting(tk, player, renderDiv);
                                 }}
                             }} catch (e) {{
                                 console.error('MEI konnte nicht geladen werden:', e);

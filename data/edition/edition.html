@@ -115,16 +115,97 @@
                         border-left: 4px solid #ccc;
                         }
 
-                        .mei-panel {
-                        width: 100%;
+                        /* =================================
+                        MEI TRIGGER (PNG-Vorschau)
+                        ================================= */
+
+                        .mei-trigger {
+                        display: block;
+                        cursor: pointer;
                         margin: 1rem 0;
-                        overflow: hidden;
                         }
 
-                        .mei-panel svg {
+                        .mei-preview {
                         width: 100%;
                         height: auto;
                         display: block;
+                        border-radius: 0.4rem;
+                        border: 2px solid transparent;
+                        transition: border-color 0.15s, opacity 0.15s;
+                        }
+
+                        .mei-trigger:hover .mei-preview {
+                        border-color: #5c9d5c;
+                        opacity: 0.9;
+                        }
+
+                        .mei-trigger-label {
+                        font-size: 0.75rem;
+                        color: #5c9d5c;
+                        text-align: center;
+                        margin-top: 0.3rem;
+                        }
+
+                        /* =================================
+                        MEI MODAL
+                        ================================= */
+
+                        #mei-modal {
+                        position: fixed;
+                        inset: 0;
+                        z-index: 1000;
+                        display: flex;
+                        align-items: flex-start;
+                        justify-content: center;
+                        padding: 2rem;
+                        background: rgba(0,0,0,0.65);
+                        overflow-y: auto;
+                        }
+
+                        #mei-modal[hidden] {
+                        display: none;
+                        }
+
+                        #mei-modal-content {
+                        background: #fff;
+                        border-radius: 0.6rem;
+                        padding: 2rem 2.5rem;
+                        width: 100%;
+                        max-width: 1400px;
+                        position: relative;
+                        box-shadow: 0 0.5rem 2rem rgba(0,0,0,0.3);
+                        }
+
+                        #mei-modal-close {
+                        position: absolute;
+                        top: 0.75rem;
+                        right: 1rem;
+                        font-size: 1.8rem;
+                        line-height: 1;
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        color: #888;
+                        padding: 0;
+                        }
+
+                        #mei-modal-close:hover {
+                        color: #222;
+                        }
+
+                        #mei-modal-render svg {
+                        width: 100%;
+                        height: auto;
+                        display: block;
+                        }
+
+                        #mei-modal-render midi-player {
+                        margin-top: 1rem;
+                        display: block;
+                        }
+
+                        g.note.playing {
+                        fill: crimson;
                         }
 
                         
@@ -225,52 +306,109 @@
                         }
 
                     </style><script src="https://www.verovio.org/javascript/latest/verovio-toolkit-wasm.js" defer></script><script src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.58,npm/@magenta/music@1.23.1/es6/core.js,npm/html-midi-player@1.5.0" defer></script><script>
-                        document.addEventListener("DOMContentLoaded", () => {
-                            verovio.module.onRuntimeInitialized = async () => {
-                                const tk = new verovio.toolkit();
-                                const containers = document.querySelectorAll('[data-mei]');
-                                for (const container of containers) {
-                                    await renderMei(tk, container);
-                                }
-                            };
+                        let highlightFrame = null;
+
+                        // Toolkit wird einmalig initialisiert und als Promise gecacht
+                        const tkReady = new Promise(resolve => {
+                            document.addEventListener("DOMContentLoaded", () => {
+                                verovio.module.onRuntimeInitialized = () => {
+                                    resolve(new verovio.toolkit());
+                                };
+                            });
                         });
 
-                        async function renderMei(tk, container) {
-                            const fileName = container.dataset.mei;
-                            const url = `https://raw.githubusercontent.com/fabianmoss/pontio-examples/main/examples/${fileName}`;
-                            const scale = parseInt(container.dataset.scale || "40");
-                            const width = Math.max(100, Math.round(container.clientWidth * 2.5));
+                        // Klick-Handler für alle MEI-Trigger
+                        document.addEventListener("DOMContentLoaded", () => {
+                            document.querySelectorAll('.mei-trigger').forEach(trigger => {
+                                trigger.addEventListener('click', () => openModal(trigger.dataset.mei));
+                            });
+
+                            // Modal schließen: Backdrop-Klick oder X-Button
+                            const modal = document.getElementById('mei-modal');
+                            document.getElementById('mei-modal-close').addEventListener('click', closeModal);
+                            modal.addEventListener('click', e => {
+                                if (e.target === modal) closeModal();
+                            });
+                            document.addEventListener('keydown', e => {
+                                if (e.key === 'Escape') closeModal();
+                            });
+                        });
+
+                        function closeModal() {
+                            if (highlightFrame) {
+                                cancelAnimationFrame(highlightFrame);
+                                highlightFrame = null;
+                            }
+                            const modal = document.getElementById('mei-modal');
+                            modal.setAttribute('hidden', '');
+                            document.body.style.overflow = '';
+                            document.getElementById('mei-modal-render').innerHTML = '';
+                        }
+
+                        function startHighlighting(tk, player, renderDiv) {
+                            function step() {
+                                if (player.playing) {
+                                    const timeMs = player.currentTime * 1000;
+                                    const elements = tk.getElementsAtTime(timeMs);
+                                    renderDiv.querySelectorAll('g.note.playing').forEach(n => n.classList.remove('playing'));
+                                    if (elements && elements.notes) {
+                                        for (const noteId of elements.notes) {
+                                            const el = document.getElementById(noteId);
+                                            if (el) el.classList.add('playing');
+                                        }
+                                    }
+                                }
+                                highlightFrame = requestAnimationFrame(step);
+                            }
+                            highlightFrame = requestAnimationFrame(step);
+                        }
+
+                        async function openModal(meiFile) {
+                            const modal    = document.getElementById('mei-modal');
+                            const renderDiv = document.getElementById('mei-modal-render');
+
+                            renderDiv.innerHTML = '<p style="padding:1rem;color:#666">Wird geladen …</p>';
+                            modal.removeAttribute('hidden');
+                            document.body.style.overflow = 'hidden';
 
                             try {
+                                const tk  = await tkReady;
+                                const url = `https://raw.githubusercontent.com/fabianmoss/pontio-examples/main/examples/${meiFile}`;
+
                                 const resp = await fetch(url);
                                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                                 const meiText = await resp.text();
 
+                                const width = Math.max(100, Math.round(
+                                    document.getElementById('mei-modal-content').clientWidth * 2.5
+                                ));
+
                                 tk.setOptions({
-                                    scale: scale,
+                                    scale: 40,
                                     pageWidth: width,
                                     adjustPageHeight: true,
                                     breaks: "auto"
                                 });
 
                                 tk.loadData(meiText);
-                                container.innerHTML = tk.renderToSVG(1);
-
+                                let html = tk.renderToSVG(1);
                                 const pageCount = tk.getPageCount();
                                 for (let p = 2; p <= pageCount; p++) {
-                                    container.innerHTML += tk.renderToSVG(p);
+                                    html += tk.renderToSVG(p);
                                 }
+                                renderDiv.innerHTML = html;
 
                                 const midiBase64 = tk.renderToMIDI();
                                 if (midiBase64) {
                                     const player = document.createElement('midi-player');
                                     player.setAttribute('src', `data:audio/midi;base64,${midiBase64}`);
                                     player.setAttribute('sound-font', 'https://storage.googleapis.com/magentadata/js/soundfonts/sgm_plus');
-                                    container.appendChild(player);
+                                    renderDiv.appendChild(player);
+                                    startHighlighting(tk, player, renderDiv);
                                 }
                             } catch (e) {
                                 console.error('MEI konnte nicht geladen werden:', e);
-                                container.textContent = `Fehler beim Laden von ${fileName}: ${e.message}`;
+                                renderDiv.textContent = `Fehler beim Laden von ${meiFile}: ${e.message}`;
                             }
                         }
                     </script></head>
@@ -3268,8 +3406,7 @@
 <br class="lb" data-n="29">reſtareſſimo conſolati; poiche mouono più gli eſſempij, che le parole,
 <br class="lb" data-n="30">e rendono maggior certezza. A. Io lo farò volontieri per ſodisfarlo. Et
 <br class="lb" data-n="31">eccoui vn poco d'eſſempio fatto nel primo Tuono.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_46.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_46.mei"><img class="mei-preview" src="png/dialogo_p_46.png" alt="Notenbeispiel dialogo_p_46"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
             </div>
@@ -3294,8 +3431,7 @@
 <br class="lb" data-n="16">le compoſitioni de' Periti di Muſica ſi può cauare. Se principiarà poi
 <br class="lb" data-n="17">in Alami re il ſoprano, l'Alto conuerrà principiare nella chorda di
 <br class="lb" data-n="18">Ela mi; &amp; all'hora la inuentione non ſerà reale; poiche vna parte dirà.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_47a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_47a.mei"><img class="mei-preview" src="png/dialogo_p_47a.png" alt="Notenbeispiel dialogo_p_47a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="19">Et l'altra dirà.
@@ -3323,8 +3459,7 @@
                <div class="fw-line fw-header-folnum"><span class="fw fw-header">PRIMA</span><span class="fw fw-folnum">48</span></div>
                <p><br class="lb" data-n="1">&amp; anco le ſue Chiaui, &amp; che ſiano per b molle. M. In che modo? A. Con
 <br class="lb" data-n="2">uien far cominciar l'Alto, &amp; poi il Tenore in queſta forma.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_48.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_48.mei"><img class="mei-preview" src="png/dialogo_p_48.png" alt="Notenbeispiel dialogo_p_48"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="3">M. Facciane gratia di dirci la cagione, perche conuiene cominciar l'Alto,
@@ -3367,8 +3502,7 @@
 <br class="lb" data-n="4">tendano, come ciò s'habbia à fare, qui formerò vn'eſſempio con tutte lo
 <br class="lb" data-n="5">quattro parti, che ſeranno ſecondo il proprio del ſecondo Tuono, e nelli
 <br class="lb" data-n="6">ſuoi proprij luoghi.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_49.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_49.mei"><img class="mei-preview" src="png/dialogo_p_49.png" alt="Notenbeispiel dialogo_p_49"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="7">Qui ſi vede, che tutte le Parti fanno principio nelle ſue Diapente, e Dia-
@@ -3394,8 +3528,7 @@
 <br class="lb" data-n="4">ne eſſer reale; poiche le parti non ſono conformi di móto, nè di figure.
 <br class="lb" data-n="5">Il terzo modo d'Inaentione è, quando vi ſerã la ſimilitudine delle figu-
 <br class="lb" data-n="6">re, &amp; delli interualli, ma non già del nome, come qui.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_50b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_50b.mei"><img class="mei-preview" src="png/dialogo_p_50b.png" alt="Notenbeispiel dialogo_p_50b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="7">Et queſte ſono le trè varietà, che ſi trouano fra le Inuentioni de Muſici.
@@ -3404,8 +3537,7 @@
 <br class="lb" data-n="10">Vna è, quando le parti ſi trouano per lnuentione eſſer ſimili d'inter-
 <br class="lb" data-n="11">ualli, &amp; figure, &amp; proteder di riga in ſpatio, ouer di ſpatio in riga per con
 <br class="lb" data-n="12">trario moto, come qui.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_50c.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_50c.mei"><img class="mei-preview" src="png/dialogo_p_50c.png" alt="Notenbeispiel dialogo_p_50c"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
             </div>
@@ -3420,8 +3552,7 @@
 <br class="lb" data-n="6">tranno ſeruire per Quinta, per Quarta, e per Terza, come à loro più pia-
 <br class="lb" data-n="7">cerà. Et, perche meglio s'intenda queſto modo, qui formarò vn'eſsem-
 <br class="lb" data-n="8">pio per Quinta lontano.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_51a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_51a.mei"><img class="mei-preview" src="png/dialogo_p_51a.png" alt="Notenbeispiel dialogo_p_51a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="9">Si troua vn'altto modo d'Inuentione, qual'è, quando due parti ſeranno
@@ -3435,8 +3566,7 @@
 <br class="lb" data-n="17">retti à cinque voci. Il medeſimo ſeruò Pietro Vinci nel ſuo primo libro
 <br class="lb" data-n="18">de’ Motetti à quattro voci. Il qual modo potranno beniſſimo vedere
 <br class="lb" data-n="19">in queſto poco d'eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_51b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_51b.mei"><img class="mei-preview" src="png/dialogo_p_51b.png" alt="Notenbeispiel dialogo_p_51b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
             </div>
@@ -3555,8 +3685,7 @@
 <br class="lb" data-n="19">rà parte alcuna d'eſſe, cantando trè, ouer quattro parti inſieme, che fac-
 <br class="lb" data-n="20">cino mouimento alcuno, il qual modo, (come già hò detto) rende poco
 <br class="lb" data-n="21">diletto, come da queſto eſſempio il tutto potraſſi vedere.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_54.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_54.mei"><img class="mei-preview" src="png/dialogo_p_54.png" alt="Notenbeispiel dialogo_p_54"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="22">Hora veggono, come quelle parti vanno egualmente in miſura per
@@ -3580,15 +3709,13 @@
 <br class="lb" data-n="9">ha detto. A. Lo dirò. Si può dire, che vna parte chiami l'altra (commu-
 <br class="lb" data-n="10">nemente parlando) quando vna parte haurà cominciato con queſte fi-
 <br class="lb" data-n="11">gure.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_55a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_55a.mei"><img class="mei-preview" src="png/dialogo_p_55a.png" alt="Notenbeispiel dialogo_p_55a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="12">Et l'altra dirà il medemo, &amp; coſi la terza parte. Et acciò vedino que-
 <br class="lb" data-n="13">ſto piu chiaramente, per eſſer coſa degna da oſſeruarſi, moſtrerò vn po-
 <br class="lb" data-n="14">co d'eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_55b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_55b.mei"><img class="mei-preview" src="png/dialogo_p_55b.png" alt="Notenbeispiel dialogo_p_55b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="15">Qui ſi vede, come finita l'Inuentione con vna parte, l'altra comincia,
@@ -3606,8 +3733,7 @@
 <br class="lb" data-n="5">fauoriſcami (ſe pur è ſua commodità) di moſtrar vn'altro eſſempio di
 <br class="lb" data-n="6">tal' inuentione fatta in altro modo; acciò ne venga più capace. A. coſi fa-
 <br class="lb" data-n="7">rò, &amp; ecco l'eſſempio in vn'altro modo compoſto.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_56.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_56.mei"><img class="mei-preview" src="png/dialogo_p_56.png" alt="Notenbeispiel dialogo_p_56"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="8">Hor ſi vede l'inuentione fatta ad vn'altro modo! Però gli ſuoi inter-
@@ -3733,8 +3859,7 @@
 <br class="lb" data-n="11">le parti modularanno con interualli congionti, e quando partendoſi da
 <br class="lb" data-n="12">vna conſonanza andarà à trouar l'altra con legitimi, &amp; ben proportiona-
 <br class="lb" data-n="13">ti interualli, come in queſte due parti.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_59.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_59.mei"><img class="mei-preview" src="png/dialogo_p_59.png" alt="Notenbeispiel dialogo_p_59"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="14">Da queſto poco di eſſempio potranno vedere il modo, che hà da tenere
@@ -3919,8 +4044,7 @@
 <br class="lb" data-n="2">e fatta la lor cadenza, ò ripoſo generale (come più piace nominarla) il Te
 <br class="lb" data-n="3">nore, già che ſi è ripoſato per ſpatio d'vna pauſa di minima, dà principio
 <br class="lb" data-n="4">all'ſnuentione, che dice.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_64b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_64b.mei"><img class="mei-preview" src="png/dialogo_p_64b.png" alt="Notenbeispiel dialogo_p_64b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="5">E parimente; poiche il Canto hà ripoſato per ſpatio d'vna pauſa di bre-
@@ -4058,8 +4182,7 @@
 <br class="lb" data-n="28">perche più per cauſa delli eſſempij ſi viene a perfetta cognitione, di che
 <br class="lb" data-n="29">ſi tratta, la prego per maggior noſtra conſolatione à non mancar in que-
 <br class="lb" data-n="30">ſto di qualche poco d'eſſempio. A. Non mancarò, &amp; eccolo.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_67.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_67.mei"><img class="mei-preview" src="png/dialogo_p_67.png" alt="Notenbeispiel dialogo_p_67"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
             </div>
@@ -4074,8 +4197,7 @@
 <br class="lb" data-n="6">G ſol re ut; qual’è fuori del numero delle cadenze proprie di eſſo Tuono,
 <br class="lb" data-n="7">lo dicano, che tanto farò. G. Se cosi le piace, s'accreſcerà l'obligo noſtro.
 <br class="lb" data-n="8">A. Lo farò volontieri, &amp; ecco che lo ſcriuo.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_68.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_68.mei"><img class="mei-preview" src="png/dialogo_p_68.png" alt="Notenbeispiel dialogo_p_68"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="9">Si ſente la cadẽza di G ſol re ut, come è di grato vdire; del che cantãdo-
@@ -4142,8 +4264,7 @@
 <br class="lb" data-n="8">derne le ragioni certamente mi fia di ſommo fauore. A. Stiano dunque
 <br class="lb" data-n="9">attente, che quanto più attenderanno, tanto meglio il tutto capiranno.
 <br class="lb" data-n="10">Dubbio non è, che queſte conſonanze in tal modo fatte, ciò è.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_70a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_70a.mei"><img class="mei-preview" src="png/dialogo_p_70a.png" alt="Notenbeispiel dialogo_p_70a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="11">Quando ſi paſſa dalla Terza all vniſono, e coſi dalla Quinta all'vniſono,
@@ -4159,8 +4280,7 @@
 <br class="lb" data-n="21">modo l'iſteſſe conſonanze, ciò è, quella parte che và per grado cõgionto,
 <br class="lb" data-n="22">anderà per ſalto, e coſi della Quinta, vna ſi mouerà, e l'altra rimarrà fer-
 <br class="lb" data-n="23">ma, &amp; ambedue faranno grato, &amp; harmonioſo vdire, &amp; ecco l'eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_70b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_70b.mei"><img class="mei-preview" src="png/dialogo_p_70b.png" alt="Notenbeispiel dialogo_p_70b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
             </div>
@@ -4271,8 +4391,7 @@
 <br class="lb" data-n="12">ouer vna diſcendente per grado diſgiunto in eleuatione della miſura, e
 <br class="lb" data-n="13">non facendo l'altra mouimento alcuno, come con queſto eſſempio ſcopri
 <br class="lb" data-n="14">rò il tutto.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_73a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_73a.mei"><img class="mei-preview" src="png/dialogo_p_73a.png" alt="Notenbeispiel dialogo_p_73a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="15">Hora ſoggiongo la Terza maggiore, il cui proprio ſerà di paſſare alla-
@@ -4281,8 +4400,7 @@
 <br class="lb" data-n="18">ſar dalla Terza all' Ottaua; e queſto fia, quando la ſuperiore farà, aſcendẽ
 <br class="lb" data-n="19">do, il mouimento congionto, e la parte baſſa il mouimento diſgionto, co-
 <br class="lb" data-n="20">me ciò farà chiaro il preſente eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_73b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_73b.mei"><img class="mei-preview" src="png/dialogo_p_73b.png" alt="Notenbeispiel dialogo_p_73b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="21">M. Dicami (la prego) per la ſua vſata corteſia; perche non poſs'io an-
@@ -4312,8 +4430,7 @@
 <br class="lb" data-n="18">non manchi(la prego) di darne vn poco d'eſſempio della Terza minore,
 <br class="lb" data-n="19">come della Terza maggiore, che meglio verremo capaci del ſodetto ſuo
 <br class="lb" data-n="20">ragionamento. A. Eccolo per non mancar del mio ſolito.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_74.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_74.mei"><img class="mei-preview" src="png/dialogo_p_74.png" alt="Notenbeispiel dialogo_p_74"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="21">Vedono, che fatta la Terza minore ſi paſſa alla Seſta minore, e coſi pari-
@@ -4379,8 +4496,7 @@
 <br class="lb" data-n="2">à ſordo, &amp; io la intenderò. e quanto più facilmente, tanto più le ne ſerò
 <br class="lb" data-n="3">obligato. A. Coſi farò: &amp; ecco vn'eſſempio d'ambidui gli paſſaggij del-
 <br class="lb" data-n="4">la Seſta minore.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_76a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_76a.mei"><img class="mei-preview" src="png/dialogo_p_76a.png" alt="Notenbeispiel dialogo_p_76a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Buono Non buono
@@ -4420,8 +4536,7 @@
 <br class="lb" data-n="32">che doppo il b ritondo, quella figura, che lo ſegue, conuiene, che di-
 <br class="lb" data-n="33">ſcenda, &amp; non altrimente. Il contrario poi s'oſſerua, , eſſendo poſte nella
 <br class="lb" data-n="34">wa
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_76b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_76b.mei"><img class="mei-preview" src="png/dialogo_p_76b.png" alt="Notenbeispiel dialogo_p_76b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                   <div class="element-box element-music">
                      <div class="element-header"><span class="icon-music">♫</span>
@@ -4830,8 +4945,7 @@
 <br class="lb" data-n="7">paſſarò ad vn'altro modo di Contraponto ſolito à farſi tal'hora da Con-
 <br class="lb" data-n="8">trapontiſti per loro diletto, oue non ſi troua la Conſonanza ottaua, che è
 <br class="lb" data-n="9">preſente.
-<br class="lb" data-n="10"><div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_86b.mei"></div>
+<br class="lb" data-n="10"><div class="mei-trigger" data-mei="dialogo_p_86b.mei"><img class="mei-preview" src="png/dialogo_p_86b.png" alt="Notenbeispiel dialogo_p_86b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto ſenza ottaua.
@@ -4848,8 +4962,7 @@
                <p><br class="lb" data-n="1">Et queſto ſi potrà dir vna oſſeruatione fatta coſi per capriccio. Soglione
 <br class="lb" data-n="2">pur ancor farne vn'altro variato dal ſopradetto, in cui non ſi troua la Con
 <br class="lb" data-n="3">ſonanza Quinta, come da queſto eſſempio ſi potrà conoſcere.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_87a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_87a.mei"><img class="mei-preview" src="png/dialogo_p_87a.png" alt="Notenbeispiel dialogo_p_87a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto ſenza Quinta.
@@ -4863,8 +4976,7 @@
 <br class="lb" data-n="5">no la terza diuerſità, che fia priuando il Contraponto della conſonanza
 <br class="lb" data-n="6">terza, coſi maggiore, come minore, per variarlo dalli ſopradeti: &amp; ecco
 <br class="lb" data-n="7">l'eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_87b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_87b.mei"><img class="mei-preview" src="png/dialogo_p_87b.png" alt="Notenbeispiel dialogo_p_87b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto ſenza Terza.
@@ -4884,8 +4996,7 @@
                <p><br class="lb" data-n="1"><br class="lb" data-n="2">tuo ragionamento. A. Coſi farò. Altri poi formaranno vn Contrapon-
 <br class="lb" data-n="3">to, oue non ſi trouarà Seſta coſi maggiore, come minore per dimoſtrarle
 <br class="lb" data-n="4">vario dalli già derti, come è il preſente.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_88a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_88a.mei"><img class="mei-preview" src="png/dialogo_p_88a.png" alt="Notenbeispiel dialogo_p_88a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto ſenza Seſte.
@@ -4897,8 +5008,7 @@
                </p>
                <p><br class="lb" data-n="5">Altri poſcia per lor diletto (acciò non ſi conformi con li predetti) non fa
 <br class="lb" data-n="6">ranno nel contraponto diſſonanza alcuna, come quiui.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_88b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_88b.mei"><img class="mei-preview" src="png/dialogo_p_88b.png" alt="Notenbeispiel dialogo_p_88b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto ſenza diſlonanze.
@@ -4925,8 +5035,7 @@
                </p>
                <p><br class="lb" data-n="1">Quelt'altro poſcia ſimilmente ſerà d'vn paſſaggio ſolo; mà fatto ad vn'
 <br class="lb" data-n="2">altro modo di figure
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_89b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_89b.mei"><img class="mei-preview" src="png/dialogo_p_89b.png" alt="Notenbeispiel dialogo_p_89b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto d'vn ſolo paſſaggio in vn'altro modo.
@@ -4954,8 +5063,7 @@
 <br class="lb" data-n="3">queſta ſcienza ſtimato pouero d'inuentioni. Altri ſimilmente (per va-
 <br class="lb" data-n="4">riar'i Contraponti) faranno vna parte tutta di figure di ſemibreui poſte
 <br class="lb" data-n="5">per principio di miſura ſopra d'vn canto figurato, come qui.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_90a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_90a.mei"><img class="mei-preview" src="png/dialogo_p_90a.png" alt="Notenbeispiel dialogo_p_90a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto di ſemibreui.
@@ -4968,8 +5076,7 @@
                <p><br class="lb" data-n="6">Alcuni altri ancora faranno vn Contraponto fatto di figure di Semibreui
 <br class="lb" data-n="7">in eleuatione della miſura ſopra il Canto figurato, meriteuole per certo
 <br class="lb" data-n="8">di conſideratione, come moſtrarò con queſto eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_90b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_90b.mei"><img class="mei-preview" src="png/dialogo_p_90b.png" alt="Notenbeispiel dialogo_p_90b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto di ſemibreui in eleuatione di miſura.
@@ -4992,8 +5099,7 @@
 <br class="lb" data-n="4">ſo, e degno di oſſeruatione; poiche è dotto, e bello, come già diſſi, ragio-
 <br class="lb" data-n="5">nando di tal obligatione ſopra il Canto Plano, &amp; anche ne moſtrarò al-
 <br class="lb" data-n="6">cuni eſſempij.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_91a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_91a.mei"><img class="mei-preview" src="png/dialogo_p_91a.png" alt="Notenbeispiel dialogo_p_91a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto d'vn ſol paſſaggio.
@@ -5039,8 +5145,7 @@
 <br class="lb" data-n="11">cui ciaſcun di loro darò qualche eſſempio. Si farà tal'hora vn Contra-
 <br class="lb" data-n="12">ponto, che potrà modularſi ſotto, e ſopra del ſuo proprio principio, oue
 <br class="lb" data-n="13">ſarà formato per Ottaua lontano, come il preſente.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_92b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_92b.mei"><img class="mei-preview" src="png/dialogo_p_92b.png" alt="Notenbeispiel dialogo_p_92b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto che ſi può cantare per ottaua alla baſſa Guida.
@@ -5089,8 +5194,7 @@
                <p><br class="lb" data-n="1">di già inteſa la ragione. Potrà dunque V. S. ſeguire à ſuo piacere. A. Si
 <br class="lb" data-n="2">troua ancora vn'altra varietà di Contraponto, qual ſi potrà modular per
 <br class="lb" data-n="3">decima ſotto al principale, come ſi ſcoprirà da queſto eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_94a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_94a.mei"><img class="mei-preview" src="png/dialogo_p_94a.png" alt="Notenbeispiel dialogo_p_94a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto che ſi può cantare alla decima baſſa.
@@ -5141,8 +5245,7 @@
 <br class="lb" data-n="15">biduoi i modi, e perciò ſeguirò in moſtrar vn'altro modo di Contrapon-
 <br class="lb" data-n="16">to ſopra il Canto Plano, ò Figurato, che potrà modularſi per Decima, e
 <br class="lb" data-n="17">Duodecima ſopra l'vno, e l'altro Canto: e ciò farò con queſto eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_95a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_95a.mei"><img class="mei-preview" src="png/dialogo_p_95a.png" alt="Notenbeispiel dialogo_p_95a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto, che ſi può modulare nell'acu:o Duodecima.
@@ -5192,8 +5295,7 @@
 <br class="lb" data-n="27">la Quarta fatta fuori d'ogni regola. Queſte dunque ſono l'oſſeruationi
 <br class="lb" data-n="28">conuenienti ad vn ſimil Contraponto; e queſto ancora fia l'eſſempio, che
 <br class="lb" data-n="29">loro aſſicurerà del tutto.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_96a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_96a.mei"><img class="mei-preview" src="png/dialogo_p_96a.png" alt="Notenbeispiel dialogo_p_96a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto, che ſi può cantare per Duodecima nel Baſſo.
@@ -5226,8 +5328,7 @@
 <br class="lb" data-n="10">ſtieri laſciar la conſonanza ſeſta; nè vſar due terze ſeguenti, l'vna doppo
 <br class="lb" data-n="11">l'altra; nè tampoco alcuna diſſonanza: e'l tutto ſerà di buona riuſcita, co-
 <br class="lb" data-n="12">me potranno conoſcere in queſto eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_97b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_97b.mei"><img class="mei-preview" src="png/dialogo_p_97b.png" alt="Notenbeispiel dialogo_p_97b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Contraponto, che ſi può modulare
@@ -5252,8 +5353,7 @@
 <br class="lb" data-n="5">obligo. Ne mancarò già di moſtrar vn Contraponto, che ſi modulerà
 <br class="lb" data-n="6">per Ottaua, per Decima, e per Duodecima in acuto, lontano dal ſuo prin-
 <br class="lb" data-n="7">cipale, &amp; lo moſtrarò con queſto eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_98b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_98b.mei"><img class="mei-preview" src="png/dialogo_p_98b.png" alt="Notenbeispiel dialogo_p_98b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Replica per Duodecima.
@@ -5361,8 +5461,7 @@
 <br class="lb" data-n="3">modularſi per Ottaua in acuto dal ſuo principale fatto nella parte Baſſa.
 <br class="lb" data-n="4">non vi ſi troua differenza alcuna: e l'iſteſſa regola ſi può vſar, &amp; all'vno,
 <br class="lb" data-n="5">&amp; all altro, come diſſi, e come potranno comprendere da queſto eſsẽpio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_101a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_101a.mei"><img class="mei-preview" src="png/dialogo_p_101a.png" alt="Notenbeispiel dialogo_p_101a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Replica per Ottaua.
@@ -5422,8 +5521,7 @@
 <br class="lb" data-n="16">doſi la parte Baſſi per interuallo d'otto voci, diſtante dal ſuo originale,
 <br class="lb" data-n="17">&amp; abbaſtando l'acuta dal ſuo primo ſtato per Quinta, come moſtrarò ho-
 <br class="lb" data-n="18">ra con l'eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_102.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_102.mei"><img class="mei-preview" src="png/dialogo_p_102.png" alt="Notenbeispiel dialogo_p_102"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Parte mutata per Ottaua.
@@ -5446,8 +5544,7 @@
 <br class="lb" data-n="11">à ſuo piacere farſene paſſaggio ad altri Contraponti. A. Scoprirò hora.
 <br class="lb" data-n="12">vn'altro Contraponto, che ſi può modular, alzando la parte Baſſa per-
 <br class="lb" data-n="13">Quinta, e la ſuperiore reſterà ferma, come qui.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_103b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_103b.mei"><img class="mei-preview" src="png/dialogo_p_103b.png" alt="Notenbeispiel dialogo_p_103b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Parte, che non ſi muoue.
@@ -5478,8 +5575,7 @@
 <br class="lb" data-n="13">però, che non ecceda più d'otto voci tra i ſuoi eſtremi, e, che’l Contra-
 <br class="lb" data-n="14">ponto non vadi ſotto il Canto Plano; mà tuttauia ſopra, &amp; ecco l'eſ-
 <br class="lb" data-n="15">ſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_104a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_104a.mei"><img class="mei-preview" src="png/dialogo_p_104a.png" alt="Notenbeispiel dialogo_p_104a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Parte alzata per Quinta.
@@ -5719,8 +5815,7 @@
 <br class="lb" data-n="22">uarà d'alcuna d'eſſe. Prima dunque moſtrarò quei fatti à due voci ſenza
 <br class="lb" data-n="23">obligo veruno, cominciando per Vniſono, e ſeguendo ſino all' Ottaua, co
 <br class="lb" data-n="24">me ſi deſidera, e queſto primo fia per Vniſono.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_110a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_110a.mei"><img class="mei-preview" src="png/dialogo_p_110a.png" alt="Notenbeispiel dialogo_p_110a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida all'Vniſono.
@@ -5738,8 +5833,7 @@
 <br class="lb" data-n="29">to eſſempio. Hora ne formo il ſecondo fatto per ſecõda; &amp; ecco l'eſ
 <br class="lb" data-n="30">.
 <br class="lb" data-n="31">ſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_110b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_110b.mei"><img class="mei-preview" src="png/dialogo_p_110b.png" alt="Notenbeispiel dialogo_p_110b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
             </div>
@@ -5756,8 +5850,7 @@
                <p><br class="lb" data-n="">Conſequente.</p>
                <p><br class="lb" data-n="1">Queſto altro, di cui dò l'eſſempio, ſarà per Terza minore, come dal conſi
 <br class="lb" data-n="2">derarlo s'accertaranno,
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_111b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_111b.mei"><img class="mei-preview" src="png/dialogo_p_111b.png" alt="Notenbeispiel dialogo_p_111b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida alla Terza.
@@ -5790,8 +5883,7 @@
                <div class="fw-line fw-header-folnum"><span class="fw fw-header">TER2A</span><span class="fw fw-folnum">112</span></div>
                <p><br class="lb" data-n="1">Queſto ſoprapoſto chiaramente ſi moſtra lonta no dalla Guida per Quar
 <br class="lb" data-n="2">ta; ma quel, che ſegne fia lontano dalla Guida per Quinta.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_112a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_112a.mei"><img class="mei-preview" src="png/dialogo_p_112a.png" alt="Notenbeispiel dialogo_p_112a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Cuida alla Quinta.
@@ -5819,8 +5911,7 @@
                <p><br class="lb" data-n="">Conſequente.</p>
                <p><br class="lb" data-n="4">Dal ſeguente eſſempio ſi dà à conoſcere quel che è fatto per Settima det
 <br class="lb" data-n="5">to Eptacordo, che altro non ſignifica, che Settima.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_112b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_112b.mei"><img class="mei-preview" src="png/dialogo_p_112b.png" alt="Notenbeispiel dialogo_p_112b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida alla Settima.
@@ -5838,8 +5929,7 @@
                <div class="fw-line fw-header-folnum"><span class="fw fw-header">PARTE</span><span class="fw fw-folnum">113</span></div>
                <p><br class="lb" data-n="1">Mi teſta il formar l'vltimo fatto per Ottaua, &amp; qui ſarà il fine delli Cano.
 <br class="lb" data-n="2">ni ſciolt; dell'vltimo adunque porgo tal eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_113a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_113a.mei"><img class="mei-preview" src="png/dialogo_p_113a.png" alt="Notenbeispiel dialogo_p_113a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Conſequente.
@@ -5855,8 +5945,7 @@
 <br class="lb" data-n="5">ma obligati ſaranno. Eprimieramente all'Vniſono verro, doue vna par-
 <br class="lb" data-n="6">te dirà l'iſteſſe figure non ſeruando però i medeſimi Tuoni, e Semituoni
 <br class="lb" data-n="7">per eſſer fatto per contrarij moti, di cui offeriſco l'eſſempio preſente.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_113b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_113b.mei"><img class="mei-preview" src="png/dialogo_p_113b.png" alt="Notenbeispiel dialogo_p_113b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida all'Vniſono per contrarij moti.
@@ -5869,8 +5958,7 @@
                <p><br class="lb" data-n="">Conſequente.</p>
                <p><br class="lb" data-n="8">Potraſſi mutar in queſto Canone il principale, e far cominciar il Tenore,
 <br class="lb" data-n="9">e dar le pauſe al Soprano, come nel preſente eſſempio ſi vede.
-<br class="lb" data-n="10"><div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_113c.mei"></div>
+<br class="lb" data-n="10"><div class="mei-trigger" data-mei="dialogo_p_113c.mei"><img class="mei-preview" src="png/dialogo_p_113c.png" alt="Notenbeispiel dialogo_p_113c"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Mutatione delle pauſe.
@@ -5885,8 +5973,7 @@
                <hr class="pb" data-page="126" data-facs="#s126">
                <div class="fw-line fw-header-folnum"><span class="fw fw-header">TERZA</span><span class="fw fw-folnum">114</span></div>
                <p><br class="lb" data-n="1">Ne formarò adeflo vn'altro per Seconda, perche ſi veda la loro varietà.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_114a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_114a.mei"><img class="mei-preview" src="png/dialogo_p_114a.png" alt="Notenbeispiel dialogo_p_114a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Seconda.
@@ -5899,8 +5986,7 @@
                <p><br class="lb" data-n="">Conſequente.</p>
                <p><br class="lb" data-n="2">Volendo poi, che il Contralto principia, daranſi le pauſe al Soprano, con
 <br class="lb" data-n="3">forme à queſto eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_114b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_114b.mei"><img class="mei-preview" src="png/dialogo_p_114b.png" alt="Notenbeispiel dialogo_p_114b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Mutatione delle pauſe.
@@ -5912,8 +5998,7 @@
                </p>
                <p><br class="lb" data-n="4">Dò l'eſſempio ancora d'vn formato alla Terza, e d'vn'altro alla Quarta;
 <br class="lb" data-n="5">a cciòdel tutto reſtino beniſſimo poſſeſſori.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_114c.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_114c.mei"><img class="mei-preview" src="png/dialogo_p_114c.png" alt="Notenbeispiel dialogo_p_114c"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida alla Terza.
@@ -5980,8 +6065,7 @@
 <br class="lb" data-n="8">ad altre varietà. A. Coſi farò, moſtrandone vno pur à due voci, che può
 <br class="lb" data-n="9">modularſi per Quinta, e per Quarta ſopra, e ſotto il principale di cui for-
 <br class="lb" data-n="10">mo queſto eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_116a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_116a.mei"><img class="mei-preview" src="png/dialogo_p_116a.png" alt="Notenbeispiel dialogo_p_116a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Quarta, &amp; Quinta ſopra, &amp; ſotto.
@@ -6006,8 +6090,7 @@
 <br class="lb" data-n="15">che V. S. (piacendole) ci moſtri con l'eſſempio, come ne fia lecito fare,
 <br class="lb" data-n="16">che queſto Canone moduli per Quarta, &amp; Quinta ſotto il principale.
 <br class="lb" data-n="17">A. Ecco l'eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_116b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_116b.mei"><img class="mei-preview" src="png/dialogo_p_116b.png" alt="Notenbeispiel dialogo_p_116b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Quinta, &amp; Quarta fatto alla Paſſa-
@@ -6162,8 +6245,7 @@
 <br class="lb" data-n="2">tione con la ſeconda, e tutte l'altre poi inſieme co'l principale, &amp; egli fia
 <br class="lb" data-n="3">contrario al primo in queſto, che verrà modulato vn Tuono più baſlo
 <br class="lb" data-n="4">del ſuo principale, come nell eſſempio potranno vedere.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_120b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_120b.mei"><img class="mei-preview" src="png/dialogo_p_120b.png" alt="Notenbeispiel dialogo_p_120b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Seconda, &amp; per Terza.
@@ -6209,8 +6291,7 @@
 <br class="lb" data-n="21">laranno lontane dal principale per Terza creſcendo l'vna dall'altra, ag-
 <br class="lb" data-n="22">giongendo l'iſteſſe pauſe all altra parte, che haurà la prima riſſolutione;
 <br class="lb" data-n="23">come qui.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_121a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_121a.mei"><img class="mei-preview" src="png/dialogo_p_121a.png" alt="Notenbeispiel dialogo_p_121a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Cuida alla Terza, &amp; alla Quinta.
@@ -6239,8 +6320,7 @@
 <br class="lb" data-n="4">no per Terza, ſempre declinando dal ſuo principale, del qual Canone dò
 <br class="lb" data-n="5">queſto eſſempio.
 <br class="lb" data-n="6">⸗
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_122a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_122a.mei"><img class="mei-preview" src="png/dialogo_p_122a.png" alt="Notenbeispiel dialogo_p_122a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida alla Ierza, &amp; alla Quinta Balla.
@@ -6267,8 +6347,7 @@
 <br class="lb" data-n="13">te, che và prima (parlando delle riſſolutioni) ſi aggiongano alcune figure
 <br class="lb" data-n="14">per dar compimento al fine della Cantilena, come conuiene, e perche mo
 <br class="lb" data-n="15">glio il poſſedino farò queſti eſſempij.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_122b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_122b.mei"><img class="mei-preview" src="png/dialogo_p_122b.png" alt="Notenbeispiel dialogo_p_122b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida all Vniſono.
@@ -6399,8 +6478,7 @@
 <br class="lb" data-n="6">E perche ſin hora hanno viſti i Canoni fatti à tre voci, me ne paſſarò alli
 <br class="lb" data-n="7">altri pure à tre voci, accompagnati però con vna parte ſciolta in queſto
 <br class="lb" data-n="8">modo.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_125b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_125b.mei"><img class="mei-preview" src="png/dialogo_p_125b.png" alt="Notenbeispiel dialogo_p_125b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">(uida all' Vniſono.
@@ -6430,8 +6508,7 @@
 <br class="lb" data-n="5">dano il tutto, ne moſtrarò alcuni altri fatti hora alla Terza, hora alla Quar
 <br class="lb" data-n="6">ta, &amp; in diuerſi modi. Dalche ne traranno il modo, che nel farne delli
 <br class="lb" data-n="7">ſimili ſi deue oſſeruare.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_126a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_126a.mei"><img class="mei-preview" src="png/dialogo_p_126a.png" alt="Notenbeispiel dialogo_p_126a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Ierza.
@@ -6477,8 +6554,7 @@
                <hr class="pb" data-page="139" data-facs="#s139">
                <div class="fw-line fw-header-folnum"><span class="fw fw-header">PARTE</span><span class="fw fw-folnum">127</span></div>
                <p><br class="lb" data-n="1">E queſto ſeguente per Quinta.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_127a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_127a.mei"><img class="mei-preview" src="png/dialogo_p_127a.png" alt="Notenbeispiel dialogo_p_127a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Quinta.
@@ -6504,8 +6580,7 @@
 <br class="lb" data-n="7">tranno aggiongerli trè, e quattro parti ſciolte, e più à loro viacere. Et à
 <br class="lb" data-n="8">queſto effetto farò queſti duoi Canoni, nell'vno de quali due parti, e nel-
 <br class="lb" data-n="9">l'altro trè ſaranno ſciolte.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_127b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_127b.mei"><img class="mei-preview" src="png/dialogo_p_127b.png" alt="Notenbeispiel dialogo_p_127b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per quarta. Conſequente.
@@ -6523,8 +6598,7 @@
                <div class="fw-line fw-header-folnum"><span class="fw fw-header">TER2A</span><span class="fw fw-folnum">128</span></div>
                <p><br class="lb" data-n="1">In queſto eſſempio hanno viſte due parti obligate, fatte per Canoni, &amp;
 <br class="lb" data-n="2">altretante ſciolte: &amp; in queſto alrro trè fiano le ſciolte, &amp; due l'obligate.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_128b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_128b.mei"><img class="mei-preview" src="png/dialogo_p_128b.png" alt="Notenbeispiel dialogo_p_128b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Parte ſciolta.
@@ -6594,8 +6668,7 @@
 <br class="lb" data-n="14">ſeruire, e perche ne reſtino più ſicure, ſeguirò in moſtrar vn Canone fat-
 <br class="lb" data-n="15">to à quatiro voci con due parti in conſeguenza per Vniſono, di cui ſcri-
 <br class="lb" data-n="16">uo queſto eſſem pio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_130a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_130a.mei"><img class="mei-preview" src="png/dialogo_p_130a.png" alt="Notenbeispiel dialogo_p_130a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Cuida per Vniſono.
@@ -6626,8 +6699,7 @@
                <p><br class="lb" data-n="">Conſequente.</p>
                <p><br class="lb" data-n="1">D'vn'altro pur anche fatto per Terza, oue ſi fanno due parti in Canone,
 <br class="lb" data-n="2">come nel ſottoſcritto darò queſto eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_131b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_131b.mei"><img class="mei-preview" src="png/dialogo_p_131b.png" alt="Notenbeispiel dialogo_p_131b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida alla Terza.
@@ -6658,8 +6730,7 @@
                <hr class="pb" data-page="144" data-facs="#s144">
                <div class="fw-line fw-header-folnum"><span class="fw fw-header">TERZA</span><span class="fw fw-folnum">132</span></div>
                <p><br class="lb" data-n="1">Il Terzo Canone fatto per Quarta ſi può veder quiui.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_132a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_132a.mei"><img class="mei-preview" src="png/dialogo_p_132a.png" alt="Notenbeispiel dialogo_p_132a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Quarta.
@@ -6686,8 +6757,7 @@
                <p><br class="lb" data-n="">Conſequente.</p>
                <p><br class="lb" data-n="2">Me ne paſſo al Quarto Canone fatto in queſta forma con due parti in
 <br class="lb" data-n="3">conſeguenza lontana vna dall altra per Quinta, il qual è di queſta ſorte.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_132b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_132b.mei"><img class="mei-preview" src="png/dialogo_p_132b.png" alt="Notenbeispiel dialogo_p_132b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Quinta.
@@ -6714,8 +6784,7 @@
                <p><br class="lb" data-n="1">Il quinto Canone fatto con le parti per conſeguenza in Ottaua ſarà con-
 <br class="lb" data-n="2">quel modo iſteſſo delli ſopradetti, ciò è, due parti in conſeguenza, &amp; fia-
 <br class="lb" data-n="3">queſto l'eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_133b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_133b.mei"><img class="mei-preview" src="png/dialogo_p_133b.png" alt="Notenbeispiel dialogo_p_133b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Cuida per Ottaua.
@@ -6741,8 +6810,7 @@
                <p><br class="lb" data-n="1"><br class="lb" data-n="2">Ne mottrarò pur anche vn'altro, delle cui parti due ſi trouaranno per-
 <br class="lb" data-n="3">Quarta, &amp; altre due per Quinta tutte in conſeguenza; perche conoſcano
 <br class="lb" data-n="4">vn'altra varietà dalli altri, &amp; ecco l'eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_134b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_134b.mei"><img class="mei-preview" src="png/dialogo_p_134b.png" alt="Notenbeispiel dialogo_p_134b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Quarta.
@@ -6777,8 +6845,7 @@
 <br class="lb" data-n="3">queſti Canoni à quattro voci per diuerſi modi. Laonde ſe ne può fare an
 <br class="lb" data-n="4">che vno, oue due per Ottaua, e due altre andranno per Quinta, come è
 <br class="lb" data-n="5">queſto.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_135a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_135a.mei"><img class="mei-preview" src="png/dialogo_p_135a.png" alt="Notenbeispiel dialogo_p_135a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Quinta.
@@ -6838,8 +6905,7 @@
 <br class="lb" data-n="18">coſa ſi ricerca per far ſimili Canoni, V. S. potrà (piacendole) paſſar più ol-
 <br class="lb" data-n="19">tre alli Canoni fatti per Diſſonanza, come ci hauea propoſto. A. Coſi fa-
 <br class="lb" data-n="20">ro; e ne formarò vno alla Seconda, che è queſto.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_136a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_136a.mei"><img class="mei-preview" src="png/dialogo_p_136a.png" alt="Notenbeispiel dialogo_p_136a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Ouida alla Seconda.
@@ -6870,8 +6936,7 @@
                <hr class="pb" data-page="149" data-facs="#s149">
                <div class="fw-line fw-header-folnum"><span class="fw fw-header">PARTE</span><span class="fw fw-folnum">137</span></div>
                <p><br class="lb" data-n="1">Ne moſtro pur anche vn'altro per Settima, ilche fia con queſto eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_137a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_137a.mei"><img class="mei-preview" src="png/dialogo_p_137a.png" alt="Notenbeispiel dialogo_p_137a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Settima.
@@ -6921,8 +6986,7 @@
 <br class="lb" data-n="12">alli altri. Onde me ne andrò ad vna modulatione à quattro voci, due de
 <br class="lb" data-n="13">quali modularanno per fuga alla Terza, &amp; altre due parimente alla Ter-
 <br class="lb" data-n="14">za tutte per contrario moto, di cui dò queſto eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_138a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_138a.mei"><img class="mei-preview" src="png/dialogo_p_138a.png" alt="Notenbeispiel dialogo_p_138a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Terza per contrario moto.
@@ -6954,8 +7018,7 @@
                <div class="fw-line fw-header-folnum"><span class="fw fw-header">PARTE</span><span class="fw fw-folnum">139</span></div>
                <p><br class="lb" data-n="1">Da queſto altro eſſempio ne haueranno vn'altro, in cui le parti ſaran lon-
 <br class="lb" data-n="2">tane dal ſuo originale per Quarta ſeguendoſi per contrario moto.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_139a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_139a.mei"><img class="mei-preview" src="png/dialogo_p_139a.png" alt="Notenbeispiel dialogo_p_139a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Quarta per contrario moto.
@@ -7066,8 +7129,7 @@
 <br class="lb" data-n="9">cuni altri Canoni fatti ſopra vna parte, in cui vna parte fugarà per Otta-
 <br class="lb" data-n="10">ua, e due poi per Decima per moti contrarij, e di queſto loro offro l'eſ-
 <br class="lb" data-n="11">ſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_142a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_142a.mei"><img class="mei-preview" src="png/dialogo_p_142a.png" alt="Notenbeispiel dialogo_p_142a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Terza, &amp; per Decima per contrario moto.
@@ -7107,8 +7169,7 @@
 <br class="lb" data-n="8">hauendone interpoſti quattro, ſoggiongeranno il Soprano, à cui ſuccede-
 <br class="lb" data-n="9">rà l'altro Tenore premeſſo il ripoſo di ſei tempi ſimili. E, perche meglio
 <br class="lb" data-n="10">il tutto ſi affaciliti, porgerò queſti eſſempij-
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_143a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_143a.mei"><img class="mei-preview" src="png/dialogo_p_143a.png" alt="Notenbeispiel dialogo_p_143a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Principale mutare le parti.
@@ -7139,8 +7200,7 @@
                <hr class="pb" data-page="156" data-facs="#s156">
                <div class="fw-line fw-header-folnum"><span class="fw fw-header">TER2A</span><span class="fw fw-folnum">144</span></div>
                <p><br class="lb" data-n="1">Ecco l'altro variato.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_144a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_144a.mei"><img class="mei-preview" src="png/dialogo_p_144a.png" alt="Notenbeispiel dialogo_p_144a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Principale mutate le parti.
@@ -7167,8 +7227,7 @@
                <p><br class="lb" data-n="">Conſequente.</p>
                <p><br class="lb" data-n="2">Hora moſtrarò come due parti ſi cantaranno per Otraua, e due per Quin
 <br class="lb" data-n="3">ta per contrario moto in queſt'altro eſſempio, che hora formarò.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_144b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_144b.mei"><img class="mei-preview" src="png/dialogo_p_144b.png" alt="Notenbeispiel dialogo_p_144b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida per Ottaua, &amp; per Quinta Conſequente.
@@ -7189,8 +7248,7 @@
 <br class="lb" data-n="2">ſoggionta la pauſa di due tempi di Breue, ſeguire il Tenore, &amp; indi, adem
 <br class="lb" data-n="3">pita l'iſteſſa diſtanza, l'altro Tenore, e finalmente doppo lo ſcorſo di ſei
 <br class="lb" data-n="4">tempi tali il Contralto, come quiui.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_145b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_145b.mei"><img class="mei-preview" src="png/dialogo_p_145b.png" alt="Notenbeispiel dialogo_p_145b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida mutare le parti.
@@ -7225,8 +7283,7 @@
                <p><br class="lb" data-n="1">ue, &amp; indi allo ſpatio di quattro tempi ſi ſoppoorrà il Soprano, che prece-
 <br class="lb" data-n="2">derà l'altro Tenore di ſei tempi dell'iſteſſa ſorte. Ilche ſi appreſenta loro
 <br class="lb" data-n="3">queſto eſſempio.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_146a.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_146a.mei"><img class="mei-preview" src="png/dialogo_p_146a.png" alt="Notenbeispiel dialogo_p_146a"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida mutate le parti.
@@ -7256,8 +7313,7 @@
 <br class="lb" data-n="6">ci da vn Tenore, e paſſati duoi tempi pur ancor di Breue, vi ſegua l'altro,
 <br class="lb" data-n="7">&amp; poi il Contralto in quattro ſimili, à cui ſucceda il Soprano dal finir
 <br class="lb" data-n="8">di ſei tempi dell'iſteſſa ſorte, non meno, che in queſto eſſempio ſi fa.
-<div class="page-block">
-                     <div class="mei-panel" data-mei="dialogo_p_146b.mei"></div>
+<div class="mei-trigger" data-mei="dialogo_p_146b.mei"><img class="mei-preview" src="png/dialogo_p_146b.png" alt="Notenbeispiel dialogo_p_146b"><div class="mei-trigger-label">♫ Zum Abspielen klicken</div>
                   </div>
                </p>
                <p><br class="lb" data-n="">Guida mutate le parti.
@@ -7471,5 +7527,9 @@
             </div>
          </div>
       </section>
+      <div id="mei-modal" hidden="">
+         <div id="mei-modal-content"><button id="mei-modal-close" aria-label="Schließen">×</button><div id="mei-modal-render"></div>
+         </div>
+      </div>
    </body>
 </html>
