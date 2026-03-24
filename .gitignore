@@ -10,6 +10,9 @@ dist/
 # MEI-Data
 data/edition/mei/*.mei
 
+#images
+data/edition/png/
+
 # Inputs
 data/pages/
 
