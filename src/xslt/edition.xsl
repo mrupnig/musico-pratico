@@ -137,15 +137,92 @@
                         border-left: 4px solid #ccc;
                         }}
 
-                        .mei-panel {{
-                        width: 100%;
+                        /* =================================
+                        MEI TRIGGER (PNG-Vorschau)
+                        ================================= */
+
+                        .mei-trigger {{
+                        display: block;
+                        cursor: pointer;
                         margin: 1rem 0;
-                        overflow: hidden;
                         }}
 
-                        .mei-panel svg {{
+                        .mei-preview {{
                         width: 100%;
                         height: auto;
+                        display: block;
+                        border-radius: 0.4rem;
+                        border: 2px solid transparent;
+                        transition: border-color 0.15s, opacity 0.15s;
+                        }}
+
+                        .mei-trigger:hover .mei-preview {{
+                        border-color: #5c9d5c;
+                        opacity: 0.9;
+                        }}
+
+                        .mei-trigger-label {{
+                        font-size: 0.75rem;
+                        color: #5c9d5c;
+                        text-align: center;
+                        margin-top: 0.3rem;
+                        }}
+
+                        /* =================================
+                        MEI MODAL
+                        ================================= */
+
+                        #mei-modal {{
+                        position: fixed;
+                        inset: 0;
+                        z-index: 1000;
+                        display: flex;
+                        align-items: flex-start;
+                        justify-content: center;
+                        padding: 2rem;
+                        background: rgba(0,0,0,0.65);
+                        overflow-y: auto;
+                        }}
+
+                        #mei-modal[hidden] {{
+                        display: none;
+                        }}
+
+                        #mei-modal-content {{
+                        background: #fff;
+                        border-radius: 0.6rem;
+                        padding: 2rem 2.5rem;
+                        width: 100%;
+                        max-width: 1400px;
+                        position: relative;
+                        box-shadow: 0 0.5rem 2rem rgba(0,0,0,0.3);
+                        }}
+
+                        #mei-modal-close {{
+                        position: absolute;
+                        top: 0.75rem;
+                        right: 1rem;
+                        font-size: 1.8rem;
+                        line-height: 1;
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        color: #888;
+                        padding: 0;
+                        }}
+
+                        #mei-modal-close:hover {{
+                        color: #222;
+                        }}
+
+                        #mei-modal-render svg {{
+                        width: 100%;
+                        height: auto;
+                        display: block;
+                        }}
+
+                        #mei-modal-render midi-player {{
+                        margin-top: 1rem;
                         display: block;
                         }}
 
@@ -254,52 +331,84 @@
                 <script src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.58,npm/@magenta/music@1.23.1/es6/core.js,npm/html-midi-player@1.5.0" defer="defer"/>
                 <script>
                     <xsl:text>
-                        document.addEventListener("DOMContentLoaded", () => {{
-                            verovio.module.onRuntimeInitialized = async () => {{
-                                const tk = new verovio.toolkit();
-                                const containers = document.querySelectorAll('[data-mei]');
-                                for (const container of containers) {{
-                                    await renderMei(tk, container);
-                                }}
-                            }};
+                        // Toolkit wird einmalig initialisiert und als Promise gecacht
+                        const tkReady = new Promise(resolve => {{
+                            document.addEventListener("DOMContentLoaded", () => {{
+                                verovio.module.onRuntimeInitialized = () => {{
+                                    resolve(new verovio.toolkit());
+                                }};
+                            }});
                         }});
 
-                        async function renderMei(tk, container) {{
-                            const fileName = container.dataset.mei;
-                            const url = `https://raw.githubusercontent.com/fabianmoss/pontio-examples/main/examples/${{fileName}}`;
-                            const scale = parseInt(container.dataset.scale || "40");
-                            const width = Math.max(100, Math.round(container.clientWidth * 2.5));
+                        // Klick-Handler für alle MEI-Trigger
+                        document.addEventListener("DOMContentLoaded", () => {{
+                            document.querySelectorAll('.mei-trigger').forEach(trigger => {{
+                                trigger.addEventListener('click', () => openModal(trigger.dataset.mei));
+                            }});
+
+                            // Modal schließen: Backdrop-Klick oder X-Button
+                            const modal = document.getElementById('mei-modal');
+                            document.getElementById('mei-modal-close').addEventListener('click', closeModal);
+                            modal.addEventListener('click', e => {{
+                                if (e.target === modal) closeModal();
+                            }});
+                            document.addEventListener('keydown', e => {{
+                                if (e.key === 'Escape') closeModal();
+                            }});
+                        }});
+
+                        function closeModal() {{
+                            const modal = document.getElementById('mei-modal');
+                            modal.setAttribute('hidden', '');
+                            document.body.style.overflow = '';
+                            document.getElementById('mei-modal-render').innerHTML = '';
+                        }}
+
+                        async function openModal(meiFile) {{
+                            const modal    = document.getElementById('mei-modal');
+                            const renderDiv = document.getElementById('mei-modal-render');
+
+                            renderDiv.innerHTML = '&lt;p style="padding:1rem;color:#666"&gt;Wird geladen …&lt;/p&gt;';
+                            modal.removeAttribute('hidden');
+                            document.body.style.overflow = 'hidden';
 
                             try {{
+                                const tk  = await tkReady;
+                                const url = `https://raw.githubusercontent.com/fabianmoss/pontio-examples/main/examples/${{meiFile}}`;
+
                                 const resp = await fetch(url);
                                 if (!resp.ok) throw new Error(`HTTP ${{resp.status}}`);
                                 const meiText = await resp.text();
 
+                                const width = Math.max(100, Math.round(
+                                    document.getElementById('mei-modal-content').clientWidth * 2.5
+                                ));
+
                                 tk.setOptions({{
-                                    scale: scale,
+                                    scale: 40,
                                     pageWidth: width,
                                     adjustPageHeight: true,
                                     breaks: "auto"
                                 }});
 
                                 tk.loadData(meiText);
-                                container.innerHTML = tk.renderToSVG(1);
-
+                                let html = tk.renderToSVG(1);
                                 const pageCount = tk.getPageCount();
                                 for (let p = 2; p &lt;= pageCount; p++) {{
-                                    container.innerHTML += tk.renderToSVG(p);
+                                    html += tk.renderToSVG(p);
                                 }}
+                                renderDiv.innerHTML = html;
 
                                 const midiBase64 = tk.renderToMIDI();
                                 if (midiBase64) {{
                                     const player = document.createElement('midi-player');
                                     player.setAttribute('src', `data:audio/midi;base64,${{midiBase64}}`);
                                     player.setAttribute('sound-font', 'https://storage.googleapis.com/magentadata/js/soundfonts/sgm_plus');
-                                    container.appendChild(player);
+                                    renderDiv.appendChild(player);
                                 }}
                             }} catch (e) {{
                                 console.error('MEI konnte nicht geladen werden:', e);
-                                container.textContent = `Fehler beim Laden von ${{fileName}}: ${{e.message}}`;
+                                renderDiv.textContent = `Fehler beim Laden von ${{meiFile}}: ${{e.message}}`;
                             }}
                         }}
                     </xsl:text>
@@ -328,7 +437,15 @@
                 <section id="edition">
                     <xsl:apply-templates select="tei:text/tei:body"/>
                 </section>
-                
+
+                <!-- MEI Modal -->
+                <div id="mei-modal" hidden="">
+                    <div id="mei-modal-content">
+                        <button id="mei-modal-close" aria-label="Schließen">&#215;</button>
+                        <div id="mei-modal-render"/>
+                    </div>
+                </div>
+
             </body>
         </html>
     </xsl:template>
@@ -433,8 +550,11 @@
     <!-- STRUKTUR-ELEMENTE                                         -->
     <!-- ========================================================= -->
     <xsl:template match="tei:notatedMusic[@mei]">
-        <div class="page-block">
-            <div class="mei-panel" data-mei="{@mei}.mei"/>
+        <div class="mei-trigger" data-mei="{@mei}.mei">
+            <img class="mei-preview"
+                 src="png/{@mei}.png"
+                 alt="Notenbeispiel {@mei}"/>
+            <div class="mei-trigger-label">&#9835; Zum Abspielen klicken</div>
         </div>
     </xsl:template>
 
