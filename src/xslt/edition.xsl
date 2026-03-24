@@ -634,8 +634,8 @@
         <div class="body">
             
             <xsl:for-each-group
-                select="tei:pb | tei:head | tei:p | tei:fw
-                      | tei:div[@type='chapter']/(tei:pb | tei:head | tei:p | tei:fw)"
+                select="tei:pb | tei:head | tei:p | tei:fw | tei:notatedMusic
+                      | tei:div[@type='chapter']/(tei:pb | tei:head | tei:p | tei:fw | tei:notatedMusic)"
                 group-starting-with="tei:pb">
                 
                 <xsl:variable name="pb" select="current-group()[1]"/>
