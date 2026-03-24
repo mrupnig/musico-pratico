@@ -138,7 +138,7 @@
                         }}
 
                         /* =================================
-                        MEI TRIGGER (PNG-Vorschau)
+                        MEI TRIGGER (SVG-Vorschau)
                         ================================= */
 
                         .mei-trigger {{
@@ -147,18 +147,28 @@
                         margin: 1rem 0;
                         }}
 
-                        .mei-preview {{
+                        .mei-preview-svg {{
+                        width: 100%;
+                        min-height: 40px;
+                        }}
+
+                        .mei-preview-svg svg {{
                         width: 100%;
                         height: auto;
                         display: block;
-                        border-radius: 0.4rem;
-                        border: 2px solid transparent;
-                        transition: border-color 0.15s, opacity 0.15s;
+                        transition: opacity 0.15s, outline 0.15s;
                         }}
 
-                        .mei-trigger:hover .mei-preview {{
-                        border-color: #5c9d5c;
-                        opacity: 0.9;
+                        .mei-trigger:hover .mei-preview-svg svg {{
+                        opacity: 0.88;
+                        outline: 2px solid #5c9d5c;
+                        outline-offset: 2px;
+                        }}
+
+                        .mei-preview-loading {{
+                        font-size: 0.8rem;
+                        color: #aaa;
+                        padding: 0.5rem 0;
                         }}
 
                         .mei-trigger-label {{
@@ -228,6 +238,39 @@
 
                         g.note.playing {{
                         fill: crimson;
+                        }}
+
+                        /* =================================
+                        TRACK CONTROLS
+                        ================================= */
+
+                        #mei-track-controls {{
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 0.5rem 1rem;
+                        align-items: center;
+                        padding: 0.6rem 0.8rem;
+                        margin-bottom: 1rem;
+                        background: #f4f4f6;
+                        border-radius: 0.4rem;
+                        font-size: 0.85rem;
+                        }}
+
+                        #mei-track-controls:empty {{
+                        display: none;
+                        }}
+
+                        .track-label {{
+                        font-weight: 600;
+                        color: #555;
+                        }}
+
+                        .track-checkbox {{
+                        display: flex;
+                        align-items: center;
+                        gap: 0.3rem;
+                        cursor: pointer;
+                        user-select: none;
                         }}
 
                         
@@ -336,42 +379,150 @@
                 <script>
                     <xsl:text>
                         let highlightFrame = null;
+                        let currentMeiText = null;
 
-                        // Toolkit wird einmalig initialisiert und als Promise gecacht
+                        // ── Toolkit: einmalige Initialisierung, dann Vorschau-SVGs rendern ──
                         const tkReady = new Promise(resolve => {{
                             document.addEventListener("DOMContentLoaded", () => {{
                                 verovio.module.onRuntimeInitialized = () => {{
-                                    resolve(new verovio.toolkit());
+                                    const tk = new verovio.toolkit();
+                                    resolve(tk);
+                                    renderAllPreviews(tk);
                                 }};
                             }});
                         }});
 
-                        // Klick-Handler für alle MEI-Trigger
+                        // ── Vorschau-SVGs ──
+                        async function renderAllPreviews(tk) {{
+                            for (const trigger of document.querySelectorAll('.mei-trigger')) {{
+                                await renderPreview(tk, trigger);
+                            }}
+                        }}
+
+                        async function renderPreview(tk, trigger) {{
+                            const meiFile = trigger.dataset.mei;
+                            const url = `https://raw.githubusercontent.com/fabianmoss/pontio-examples/main/examples/${{meiFile}}`;
+                            try {{
+                                const resp = await fetch(url);
+                                if (!resp.ok) return;
+                                const meiText = await resp.text();
+                                const width = Math.max(100, Math.round(trigger.clientWidth * 2.5));
+                                tk.setOptions({{ scale: 40, pageWidth: width, adjustPageHeight: true, breaks: "auto" }});
+                                tk.loadData(meiText);
+                                let html = tk.renderToSVG(1);
+                                const pageCount = tk.getPageCount();
+                                for (let p = 2; p &lt;= pageCount; p++) {{ html += tk.renderToSVG(p); }}
+                                const previewDiv = trigger.querySelector('.mei-preview-svg');
+                                if (previewDiv) previewDiv.innerHTML = html;
+                            }} catch (e) {{
+                                console.warn(`Vorschau für ${{meiFile}} fehlgeschlagen:`, e);
+                            }}
+                        }}
+
+                        // ── MEI-Hilfsfunktionen ──
+                        function extractStaves(meiText) {{
+                            const doc = new DOMParser().parseFromString(meiText, 'application/xml');
+                            const ns = 'http://www.music-encoding.org/ns/mei';
+                            return [...doc.getElementsByTagNameNS(ns, 'staffDef')].map(def => ({{
+                                n:     def.getAttribute('n'),
+                                label: def.getAttribute('label') || `Stimme ${{def.getAttribute('n')}}`
+                            }}));
+                        }}
+
+                        function applyStaffFilter(meiText, hiddenStaves) {{
+                            if (hiddenStaves.size === 0) return meiText;
+                            const doc = new DOMParser().parseFromString(meiText, 'application/xml');
+                            const ns = 'http://www.music-encoding.org/ns/mei';
+                            for (const el of [...doc.getElementsByTagNameNS(ns, 'staffDef')]) {{
+                                if (hiddenStaves.has(el.getAttribute('n'))) el.parentNode.removeChild(el);
+                            }}
+                            for (const el of [...doc.getElementsByTagNameNS(ns, 'staff')]) {{
+                                if (hiddenStaves.has(el.getAttribute('n'))) el.parentNode.removeChild(el);
+                            }}
+                            return new XMLSerializer().serializeToString(doc);
+                        }}
+
+                        // ── Modal-Rendering ──
+                        async function renderMeiInModal(tk, meiText) {{
+                            if (highlightFrame) {{ cancelAnimationFrame(highlightFrame); highlightFrame = null; }}
+                            const renderDiv = document.getElementById('mei-modal-render');
+                            const width = Math.max(100, Math.round(
+                                document.getElementById('mei-modal-content').clientWidth * 2.5
+                            ));
+                            tk.setOptions({{ scale: 40, pageWidth: width, adjustPageHeight: true, breaks: "auto" }});
+                            tk.loadData(meiText);
+                            let html = tk.renderToSVG(1);
+                            const pageCount = tk.getPageCount();
+                            for (let p = 2; p &lt;= pageCount; p++) {{ html += tk.renderToSVG(p); }}
+                            renderDiv.innerHTML = html;
+                            const midiBase64 = tk.renderToMIDI();
+                            if (midiBase64) {{
+                                const player = document.createElement('midi-player');
+                                player.setAttribute('src', `data:audio/midi;base64,${{midiBase64}}`);
+                                player.setAttribute('sound-font', 'https://storage.googleapis.com/magentadata/js/soundfonts/sgm_plus');
+                                renderDiv.appendChild(player);
+                                startHighlighting(tk, player, renderDiv);
+                            }}
+                        }}
+
+                        function renderTrackControls(staves) {{
+                            const container = document.getElementById('mei-track-controls');
+                            if (staves.length &lt;= 1) {{ container.innerHTML = ''; return; }}
+                            let html = '&lt;span class="track-label"&gt;Stimmen:&lt;/span&gt;';
+                            for (const s of staves) {{
+                                html += `&lt;label class="track-checkbox"&gt;&lt;input type="checkbox" checked data-staff="${{s.n}}"&gt; ${{s.label}}&lt;/label&gt;`;
+                            }}
+                            container.innerHTML = html;
+                            container.querySelectorAll('input[type="checkbox"]').forEach(cb => {{
+                                cb.addEventListener('change', async () => {{
+                                    const hidden = new Set(
+                                        [...container.querySelectorAll('input[type="checkbox"]:not(:checked)')].map(i => i.dataset.staff)
+                                    );
+                                    const tk = await tkReady;
+                                    await renderMeiInModal(tk, applyStaffFilter(currentMeiText, hidden));
+                                }});
+                            }});
+                        }}
+
+                        // ── Klick-Handler &amp; Modal ──
                         document.addEventListener("DOMContentLoaded", () => {{
                             document.querySelectorAll('.mei-trigger').forEach(trigger => {{
                                 trigger.addEventListener('click', () => openModal(trigger.dataset.mei));
                             }});
-
-                            // Modal schließen: Backdrop-Klick oder X-Button
                             const modal = document.getElementById('mei-modal');
                             document.getElementById('mei-modal-close').addEventListener('click', closeModal);
-                            modal.addEventListener('click', e => {{
-                                if (e.target === modal) closeModal();
-                            }});
-                            document.addEventListener('keydown', e => {{
-                                if (e.key === 'Escape') closeModal();
-                            }});
+                            modal.addEventListener('click', e => {{ if (e.target === modal) closeModal(); }});
+                            document.addEventListener('keydown', e => {{ if (e.key === 'Escape') closeModal(); }});
                         }});
 
                         function closeModal() {{
-                            if (highlightFrame) {{
-                                cancelAnimationFrame(highlightFrame);
-                                highlightFrame = null;
-                            }}
-                            const modal = document.getElementById('mei-modal');
-                            modal.setAttribute('hidden', '');
+                            if (highlightFrame) {{ cancelAnimationFrame(highlightFrame); highlightFrame = null; }}
+                            document.getElementById('mei-modal').setAttribute('hidden', '');
                             document.body.style.overflow = '';
                             document.getElementById('mei-modal-render').innerHTML = '';
+                            document.getElementById('mei-track-controls').innerHTML = '';
+                            currentMeiText = null;
+                        }}
+
+                        async function openModal(meiFile) {{
+                            const modal     = document.getElementById('mei-modal');
+                            const renderDiv = document.getElementById('mei-modal-render');
+                            renderDiv.innerHTML = '&lt;p style="padding:1rem;color:#666"&gt;Wird geladen …&lt;/p&gt;';
+                            document.getElementById('mei-track-controls').innerHTML = '';
+                            modal.removeAttribute('hidden');
+                            document.body.style.overflow = 'hidden';
+                            try {{
+                                const tk  = await tkReady;
+                                const url = `https://raw.githubusercontent.com/fabianmoss/pontio-examples/main/examples/${{meiFile}}`;
+                                const resp = await fetch(url);
+                                if (!resp.ok) throw new Error(`HTTP ${{resp.status}}`);
+                                currentMeiText = await resp.text();
+                                renderTrackControls(extractStaves(currentMeiText));
+                                await renderMeiInModal(tk, currentMeiText);
+                            }} catch (e) {{
+                                console.error('MEI konnte nicht geladen werden:', e);
+                                renderDiv.textContent = `Fehler beim Laden von ${{meiFile}}: ${{e.message}}`;
+                            }}
                         }}
 
                         function startHighlighting(tk, player, renderDiv) {{
@@ -382,7 +533,7 @@
                                     renderDiv.querySelectorAll('g.note.playing').forEach(n => n.classList.remove('playing'));
                                     if (elements &amp;&amp; elements.notes) {{
                                         for (const noteId of elements.notes) {{
-                                            const el = document.getElementById(noteId);
+                                            const el = renderDiv.querySelector(`#${{noteId}}`);
                                             if (el) el.classList.add('playing');
                                         }}
                                     }}
@@ -390,55 +541,6 @@
                                 highlightFrame = requestAnimationFrame(step);
                             }}
                             highlightFrame = requestAnimationFrame(step);
-                        }}
-
-                        async function openModal(meiFile) {{
-                            const modal    = document.getElementById('mei-modal');
-                            const renderDiv = document.getElementById('mei-modal-render');
-
-                            renderDiv.innerHTML = '&lt;p style="padding:1rem;color:#666"&gt;Wird geladen …&lt;/p&gt;';
-                            modal.removeAttribute('hidden');
-                            document.body.style.overflow = 'hidden';
-
-                            try {{
-                                const tk  = await tkReady;
-                                const url = `https://raw.githubusercontent.com/fabianmoss/pontio-examples/main/examples/${{meiFile}}`;
-
-                                const resp = await fetch(url);
-                                if (!resp.ok) throw new Error(`HTTP ${{resp.status}}`);
-                                const meiText = await resp.text();
-
-                                const width = Math.max(100, Math.round(
-                                    document.getElementById('mei-modal-content').clientWidth * 2.5
-                                ));
-
-                                tk.setOptions({{
-                                    scale: 40,
-                                    pageWidth: width,
-                                    adjustPageHeight: true,
-                                    breaks: "auto"
-                                }});
-
-                                tk.loadData(meiText);
-                                let html = tk.renderToSVG(1);
-                                const pageCount = tk.getPageCount();
-                                for (let p = 2; p &lt;= pageCount; p++) {{
-                                    html += tk.renderToSVG(p);
-                                }}
-                                renderDiv.innerHTML = html;
-
-                                const midiBase64 = tk.renderToMIDI();
-                                if (midiBase64) {{
-                                    const player = document.createElement('midi-player');
-                                    player.setAttribute('src', `data:audio/midi;base64,${{midiBase64}}`);
-                                    player.setAttribute('sound-font', 'https://storage.googleapis.com/magentadata/js/soundfonts/sgm_plus');
-                                    renderDiv.appendChild(player);
-                                    startHighlighting(tk, player, renderDiv);
-                                }}
-                            }} catch (e) {{
-                                console.error('MEI konnte nicht geladen werden:', e);
-                                renderDiv.textContent = `Fehler beim Laden von ${{meiFile}}: ${{e.message}}`;
-                            }}
                         }}
                     </xsl:text>
                 </script>
@@ -471,6 +573,7 @@
                 <div id="mei-modal" hidden="">
                     <div id="mei-modal-content">
                         <button id="mei-modal-close" aria-label="Schließen">&#215;</button>
+                        <div id="mei-track-controls"/>
                         <div id="mei-modal-render"/>
                     </div>
                 </div>
@@ -580,9 +683,9 @@
     <!-- ========================================================= -->
     <xsl:template match="tei:notatedMusic[@mei]">
         <div class="mei-trigger" data-mei="{@mei}.mei">
-            <img class="mei-preview"
-                 src="png/{@mei}.png"
-                 alt="Notenbeispiel {@mei}"/>
+            <div class="mei-preview-svg">
+                <span class="mei-preview-loading">Notenbeispiel wird geladen …</span>
+            </div>
             <div class="mei-trigger-label">&#9835; Zum Abspielen klicken</div>
         </div>
     </xsl:template>
